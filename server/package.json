@@ -11,12 +11,17 @@
   "license": "ISC",
   "packageManager": "pnpm@10.30.3",
   "dependencies": {
+    "@prisma/adapter-pg": "^7.4.2",
+    "@prisma/client": "^7.4.2",
     "express": "^5.2.1",
-    "gitflow": "^0.5.5"
+    "gitflow": "^0.5.5",
+    "pg": "^8.20.0",
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
     "@types/node": "^25.3.5",
+    "@types/pg": "^8.18.0",
     "dotenv": "^17.3.1",
     "nodemon": "^3.1.14",
     "prisma": "^7.4.2",
