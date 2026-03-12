@@ -6,11 +6,7 @@ import {
   AccountType,
   LineType,
 } from '../generated/prisma/client';
-
-const connectionString = `${process.env.DATABASE_URL}`;
-const pool = new Pool({ connectionString });
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+import { prisma } from '../src/utils/prisma';
 
 async function main() {
   console.log('🌱 Starting database seed...');
@@ -25,7 +21,7 @@ async function main() {
   const cashAccount = await prisma.account.create({
     data: {
       name: 'Operating Cash',
-      type: AccountType.ASSETS, 
+      type: AccountType.ASSETS,
       userId: user.id,
     },
   });
@@ -33,7 +29,7 @@ async function main() {
   const capitalAccount = await prisma.account.create({
     data: {
       name: "Owner's Equity",
-      type: AccountType.EQUITY, 
+      type: AccountType.EQUITY,
       userId: user.id,
     },
   });
@@ -41,7 +37,6 @@ async function main() {
     `✅ Created Accounts: ${cashAccount.name}, ${capitalAccount.name}`,
   );
 
- 
   const amountCents = 1000000;
 
   const journalEntry = await prisma.journalEntry.create({
@@ -52,7 +47,7 @@ async function main() {
         create: [
           {
             amount: amountCents,
-            type: LineType.DEBIT, 
+            type: LineType.DEBIT,
             accountId: cashAccount.id,
           },
           {
