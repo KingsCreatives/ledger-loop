@@ -4,3 +4,4 @@ export const formatCurrency = (cents: number) => {
     currency: 'USD',
   }).format(cents / 100);
 };
+

@@ -2,9 +2,13 @@
 
 import { useState, useEffect } from 'react';
 
-import { formatCurrency } from '../utils';
+import { formatCurrency } from '@/app/utils';
 
-const BalanceCard = () => {
+interface Props {
+  refreshTrigger: number;
+}
+
+const BalanceCard = ({refreshTrigger}: Props) => {
   const [balance, setBalance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -26,7 +30,7 @@ const BalanceCard = () => {
     };
 
     fetchBalance();
-  }, []);
+  }, [refreshTrigger]);
 
   if (isLoading) {
     return (

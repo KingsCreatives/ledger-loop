@@ -74,4 +74,8 @@ export class LedgerService {
 
     return balance;
   }
+
+  static async listAccounts() {
+    return await prisma.account.findMany();
+  }
 }

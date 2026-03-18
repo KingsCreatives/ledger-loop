@@ -40,4 +40,18 @@ export class LedgerController {
       });
     }
   }
+
+  static async getAccounts(req: Request, res: Response) {
+    try {
+      const accounts = await LedgerService.listAccounts();
+      return res.status(StatusCodes.OK).json(accounts);
+    } catch (error) {
+      return res.status(StatusCodes.BAD_REQUEST).json({
+        message:
+          error instanceof Error
+            ? error.message
+            : 'An unexpected error occurred',
+      });
+    }
+  }
 }
