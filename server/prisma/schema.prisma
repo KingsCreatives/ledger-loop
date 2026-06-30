@@ -23,6 +23,7 @@ enum LineType {
 model User {
  id  String @id @default(uuid())
  email String @unique
+ password String
  accounts Account[]
  createdAt DateTime @default(now())
 }

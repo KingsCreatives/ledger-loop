@@ -7,13 +7,17 @@ import {
   LineType,
 } from '../generated/prisma/client';
 import { prisma } from '../src/utils/prisma';
+import { AuthService } from '../src/services/auth.service';
 
 async function main() {
   console.log('🌱 Starting database seed...');
 
+  const hashedPassword = await AuthService.hashPassword('password123');
+
   const user = await prisma.user.create({
     data: {
       email: `finance_admin_${Math.floor(Math.random() * 10000)}@example.com`,
+      password: hashedPassword,
     },
   });
   console.log(`✅ Created User: ${user.email}`);

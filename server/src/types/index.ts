@@ -11,3 +11,8 @@ export interface CreateJournalEntryDTO {
   description: string;
   lines: CreateTransactionLineDTO[];
 }
+
+export type PublicUser = {
+  id: string;
+  email: string;
+}
