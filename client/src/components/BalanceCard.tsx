@@ -17,7 +17,7 @@ const BalanceCard = ({refreshTrigger}: Props) => {
       try {
         setIsLoading(true);
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/ledger/balance/9063bc8e-e752-4e19-a164-c012c684ebfd`,
+          `${process.env.NEXT_PUBLIC_API_URL}/ledger/balance/450e0da0-294f-458c-b0ee-179c23bea97a`,
         );
         const data = await response.json();
 
