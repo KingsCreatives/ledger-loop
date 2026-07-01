@@ -1,7 +1,11 @@
 import bcrypt from 'bcrypt';
 import { prisma } from '../utils/prisma';
-import { PublicUser } from '../types';
-import { ValidationError, ConflictError } from '../utils/errors';
+import { AuthUser, PublicUser } from '../types';
+import {
+  ValidationError,
+  ConflictError,
+  UnauthorizedError,
+} from '../utils/errors';
 import { signupSchema } from '../schemas/auth.schema';
 
 export class AuthService {
@@ -23,7 +27,8 @@ export class AuthService {
     const parsed = signupSchema.safeParse({ email, password });
 
     if (!parsed.success) {
-      throw new ValidationError(parsed.error.issues[0].message);
+      const message = parsed.error.issues[0]?.message ?? 'Invalid input';
+      throw new ValidationError(message);
     }
 
     const existingUser = await prisma.user.findUnique({ where: { email } });
@@ -38,5 +43,32 @@ export class AuthService {
       data: { email, password: hashedPassword },
       select: { id: true, email: true },
     });
+  }
+
+  static async findUserByEmail(email: string): Promise<AuthUser> {
+    const user = await prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true, password: true },
+    });
+
+    if (!user) {
+      throw new UnauthorizedError('Invalid credentials');
+    }
+
+    return user;
+  }
+
+  static async loginUser(email: string, password: string): Promise<PublicUser> {
+    const user = await this.findUserByEmail(email);
+    const isPasswordValid = await this.comparePasswords(
+      password,
+      user.password,
+    );
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedError('Invalid credentials');
+    }
+
+    return { id: user.id, email: user.email };
   }
 }

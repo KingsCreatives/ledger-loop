@@ -21,3 +21,9 @@ export class ValidationError extends AppError {
     super(message, StatusCodes.BAD_REQUEST);
   }
 }
+
+export class UnauthorizedError extends AppError {
+  constructor(message: string) {
+    super(message, StatusCodes.UNAUTHORIZED);
+  }
+}
