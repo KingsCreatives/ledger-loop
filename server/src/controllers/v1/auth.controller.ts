@@ -33,4 +33,18 @@ export class AuthController {
       });
     }
   }
+
+  static async me(req: Request, res: Response) {
+    try {
+      const user = await AuthService.getUserById(req.session.userId!);
+      return res.status(StatusCodes.OK).json(user);
+    } catch (error) {
+      if (error instanceof AppError) {
+        return res.status(error.statusCode).json({ message: error.message });
+      }
+      return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+        message: 'An unexpected error occurred',
+      });
+    }
+  }
 }
