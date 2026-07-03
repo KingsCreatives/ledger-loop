@@ -3,7 +3,7 @@ import { CreateJournalEntryDTO } from '../types';
 import { prisma } from '../utils/prisma';
 
 export class LedgerService {
-  static async createEntry(data: CreateJournalEntryDTO) {
+  static async createEntry(data: CreateJournalEntryDTO, userId: string) {
     if (data.lines.length < 2) {
       throw new Error('A journal entry must have at least two transactions');
     }
@@ -25,7 +25,17 @@ export class LedgerService {
       );
     }
 
-    console.log('Validation passed! Ready to save to the db.');
+    const accountIds = data.lines.map((line) => line.accountId);
+
+    const accounts = await prisma.account.findMany({
+      where: { id: { in: accountIds }, userId },
+    });
+
+    if (accounts.length !== accountIds.length) {
+      throw new Error(
+        'One or more account IDs are invalid or do not belong to the user',
+      );
+    }
 
     const newEntry = await prisma.journalEntry.create({
       data: {
@@ -38,11 +48,14 @@ export class LedgerService {
     return newEntry;
   }
 
-  static async getAccountBalance(accountId: string): Promise<number> {
+  static async getAccountBalance(
+    accountId: string,
+    userId: string,
+  ): Promise<number> {
     if (!accountId) throw new Error('No account Id provided');
 
     const account = await prisma.account.findUnique({
-      where: { id: accountId },
+      where: { id: accountId, userId },
       select: { type: true },
     });
 
@@ -51,9 +64,7 @@ export class LedgerService {
     const aggregations = await prisma.transactionLine.groupBy({
       by: ['type'],
       where: { accountId },
-      _sum: {
-        amount: true,
-      },
+      _sum: { amount: true },
     });
 
     const debitSum =
@@ -75,7 +86,7 @@ export class LedgerService {
     return balance;
   }
 
-  static async listAccounts() {
-    return await prisma.account.findMany();
+  static async listAccounts(userId: string) {
+    return await prisma.account.findMany({ where: { userId } });
   }
 }

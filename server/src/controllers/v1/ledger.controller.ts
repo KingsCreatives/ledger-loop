@@ -5,7 +5,10 @@ import { StatusCodes } from 'http-status-codes';
 export class LedgerController {
   static async create(req: Request, res: Response) {
     try {
-      const newEntry = await LedgerService.createEntry(req.body);
+      const newEntry = await LedgerService.createEntry(
+        req.body,
+        req.session.userId!,
+      );
       return res.status(StatusCodes.CREATED).json(newEntry);
     } catch (error) {
       return res.status(StatusCodes.BAD_REQUEST).json({
@@ -26,7 +29,10 @@ export class LedgerController {
           message: 'A valid Account ID must be provided in the URL',
         });
       }
-      const accountBalance = await LedgerService.getAccountBalance(accountId);
+      const accountBalance = await LedgerService.getAccountBalance(
+        accountId,
+        req.session.userId!,
+      );
       return res.status(StatusCodes.OK).json({
         accountId,
         balance: accountBalance,
@@ -43,7 +49,7 @@ export class LedgerController {
 
   static async getAccounts(req: Request, res: Response) {
     try {
-      const accounts = await LedgerService.listAccounts();
+      const accounts = await LedgerService.listAccounts(req.session.userId!);
       return res.status(StatusCodes.OK).json(accounts);
     } catch (error) {
       return res.status(StatusCodes.BAD_REQUEST).json({
