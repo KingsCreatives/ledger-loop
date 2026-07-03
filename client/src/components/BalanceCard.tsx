@@ -3,12 +3,14 @@
 import { useState, useEffect } from 'react';
 
 import { formatCurrency } from '@/app/utils';
+import api from '@/lib/axios';
 
 interface Props {
+  accountId: string;
   refreshTrigger: number;
 }
 
-const BalanceCard = ({refreshTrigger}: Props) => {
+const BalanceCard = ({ accountId, refreshTrigger }: Props) => {
   const [balance, setBalance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -16,12 +18,8 @@ const BalanceCard = ({refreshTrigger}: Props) => {
     const fetchBalance = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/ledger/balance/2ff28f44-b96c-4da2-a351-794ffcdfe836`,
-        );
-        const data = await response.json();
-
-        setBalance(data.balance);
+        const response = await api.get(`/ledger/balance/${accountId}`);
+        setBalance(response.data.balance);
       } catch (error) {
         console.error('Failed to fetch:', error);
       } finally {
@@ -30,7 +28,7 @@ const BalanceCard = ({refreshTrigger}: Props) => {
     };
 
     fetchBalance();
-  }, [refreshTrigger]);
+  }, [accountId, refreshTrigger]);
 
   if (isLoading) {
     return (

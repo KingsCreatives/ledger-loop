@@ -1,7 +1,5 @@
 'use client';
 
-import axios from 'axios';
-
 import { useEffect, useState } from 'react';
 import {
   Select,
@@ -11,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import api from '@/lib/axios';
 
 interface Account {
   id: string;
@@ -32,11 +31,12 @@ export const AccountSelector = ({
 
   useEffect(() => {
     const fetchAccounts = async () => {
-      const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/ledger/accounts`,
-      );
-      const result = response.data;
-      setAccounts(result);
+      try {
+        const response = await api.get('/ledger/accounts');
+        setAccounts(response.data);
+      } catch (error) {
+        console.error('Failed to fetch accounts:', error);
+      }
     };
     fetchAccounts();
   }, []);

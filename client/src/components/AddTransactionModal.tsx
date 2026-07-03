@@ -12,14 +12,13 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AccountSelector } from './AccountSelector';
-
+import api from '@/lib/axios';
 interface Props {
-  onSuccess: () => void; 
+  onSuccess: () => void;
 }
 
 export const AddTransactionModal = ({ onSuccess }: Props) => {
-
-  const [open, setOpen] = useState(false); 
+  const [open, setOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
@@ -43,11 +42,11 @@ export const AddTransactionModal = ({ onSuccess }: Props) => {
     };
 
     try {
-      await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/ledger`, payload);
-      setOpen(false); 
-      setDescription(''); 
+      await api.post('/ledger', payload);
+      setOpen(false);
+      setDescription('');
       setAmount('');
-      onSuccess(); 
+      onSuccess();
     } catch (error) {
       console.error('Transaction failed', error);
     } finally {

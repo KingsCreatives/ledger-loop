@@ -1,25 +1,58 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import BalanceCard from '@/components/BalanceCard';
 import { AddTransactionModal } from '@/components/AddTransactionModal';
+import { useAuth } from '@/context/AuthContext';
+import api from '@/lib/axios';
 
 export default function Home() {
+  const { user, isLoading } = useAuth();
+  const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [cashAccountId, setCashAccountId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push('/login');
+    }
+  }, [user, isLoading, router]);
+
+  useEffect(() => {
+    if (!user) return;
+    api
+      .get('/ledger/accounts')
+      .then((res) => {
+        const cash = res.data.find((a: any) => a.type === 'ASSETS');
+        if (cash) setCashAccountId(cash.id);
+      })
+      .catch(console.error);
+  }, [user]);
 
   const handleTransactionSuccess = () => {
     setRefreshKey((prev) => prev + 1);
   };
+
+  if (isLoading) {
+    return (
+      <div className='min-h-screen bg-[#0d1117] flex items-center justify-center'>
+        <p className='text-white'>Loading...</p>
+      </div>
+    );
+  }
+
+  if (!user) return null;
 
   return (
     <main className='min-h-screen bg-[#0d1117] text-white p-6 md:p-12'>
       <header className='flex justify-between items-center mb-12 max-w-6xl mx-auto'>
         <div>
           <h1 className='text-2xl font-bold tracking-tight'>LedgerLoop</h1>
-          <p className='text-sm text-gray-400'>Good morning, Accountant</p>
+          <p className='text-sm text-gray-400'>Welcome, {user.email}</p>
         </div>
         <div className='h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center font-bold shadow-lg shadow-blue-500/20'>
-          C
+          {user.email[0].toUpperCase()}
         </div>
       </header>
 
@@ -29,11 +62,15 @@ export default function Home() {
             Operating Cash
           </p>
 
-          <BalanceCard refreshTrigger={refreshKey} />
+          {cashAccountId && (
+            <BalanceCard
+              accountId={cashAccountId}
+              refreshTrigger={refreshKey}
+            />
+          )}
 
           <div className='mt-8 flex gap-3'>
             <AddTransactionModal onSuccess={handleTransactionSuccess} />
-
             <button className='px-6 py-2.5 bg-white/10 border border-white/10 rounded-full font-bold text-sm hover:bg-white/20 transition-all active:scale-95'>
               Details
             </button>
