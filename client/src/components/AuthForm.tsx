@@ -6,15 +6,15 @@ import api from '@/lib/axios';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { authConstant } from '@/lib/constants';
+import { useAuth } from '@/context/AuthContext';
 
 interface AuthFormProps {
   mode: 'login' | 'signup';
 }
 
-
-
 const AuthForm = ({ mode }: AuthFormProps) => {
   const router = useRouter();
+  const { login } = useAuth();
   const { title, buttonText, loadingText, endpoint, redirectTo, footer } =
     authConstant[mode];
 
@@ -27,7 +27,12 @@ const AuthForm = ({ mode }: AuthFormProps) => {
     setIsLoading(true);
     setError('');
     try {
-      await api.post(endpoint, { email, password });
+      const res = await api.post(endpoint, { email, password });
+
+      if (mode === 'login') {
+        login(res.data);
+      }
+
       router.push(redirectTo);
     } catch (err: any) {
       setError(err.response?.data?.message || 'Something went wrong');

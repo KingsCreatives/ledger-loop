@@ -8,7 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/axios';
 
 export default function Home() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const router = useRouter();
   const [refreshKey, setRefreshKey] = useState(0);
   const [cashAccountId, setCashAccountId] = useState<string | null>(null);
@@ -44,6 +44,11 @@ export default function Home() {
 
   if (!user) return null;
 
+  const handleLogout = async () => {
+    await logout();
+    router.push('/login');
+  };
+
   return (
     <main className='min-h-screen bg-[#0d1117] text-white p-6 md:p-12'>
       <header className='flex justify-between items-center mb-12 max-w-6xl mx-auto'>
@@ -51,11 +56,19 @@ export default function Home() {
           <h1 className='text-2xl font-bold tracking-tight'>LedgerLoop</h1>
           <p className='text-sm text-gray-400'>Welcome, {user.email}</p>
         </div>
-        <div className='h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center font-bold shadow-lg shadow-blue-500/20'>
-          {user.email[0].toUpperCase()}
+
+        <div className='flex items-center gap-4'>
+          <button
+            onClick={handleLogout}
+            className='text-sm text-gray-400 hover:text-white transition-colors'
+          >
+            Sign out
+          </button>
+          <div className='h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center font-bold shadow-lg shadow-blue-500/20'>
+            {user.email[0].toUpperCase()}
+          </div>
         </div>
       </header>
-
       <div className='max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6'>
         <div className='col-span-1 md:col-span-2 p-8 rounded-3xl bg-linear-to-br from-white/10 to-white/5 border border-white/10 shadow-2xl transition-all hover:border-white/20'>
           <p className='text-sm font-medium text-gray-400 uppercase tracking-widest opacity-70'>
