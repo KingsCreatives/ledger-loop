@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useRouter } from 'next/navigation';
 
@@ -12,15 +11,9 @@ export default function DashboardLayout({
   const { user, isLoading, logout } = useAuth();
   const router = useRouter();
 
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.push('/login');
-    }
-  }, [user, isLoading, router]);
-
   const handleLogout = async () => {
     await logout();
-    router.push('/login');
+    router.push('/');
   };
 
   if (isLoading) {
@@ -43,11 +36,11 @@ export default function DashboardLayout({
         <div className='flex items-center gap-4'>
           <button
             onClick={handleLogout}
-            className='text-sm text-gray-400 hover:text-white transition-colors'
+            className='text-sm text-gray-400 hover:text-white transition-colors cursor-pointer'
           >
             Sign out
           </button>
-          <div className='h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center font-bold shadow-lg shadow-blue-500/20'>
+          <div className='h-10 w-10 rounded-full bg-primary flex items-center justify-center font-bold shadow-lg shadow-primary/20 cursor-pointer transform transition-all hover:scale-105'>
             {user.email[0].toUpperCase()}
           </div>
         </div>

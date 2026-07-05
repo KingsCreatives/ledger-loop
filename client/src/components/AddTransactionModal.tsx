@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import axios from 'axios';
 import {
   Dialog,
   DialogContent,
@@ -57,7 +56,7 @@ export const AddTransactionModal = ({ onSuccess }: Props) => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button className='px-6 py-2.5 bg-white text-black rounded-full font-bold text-sm hover:bg-gray-200 transition'>
+        <Button className='px-6 py-2.5 bg-white text-black rounded-full font-bold text-sm hover:bg-gray-200 transition cursor-pointer'>
           Add Transaction
         </Button>
       </DialogTrigger>
@@ -69,7 +68,7 @@ export const AddTransactionModal = ({ onSuccess }: Props) => {
         </DialogHeader>
 
         <div className='space-y-6 py-4'>
-          <div className='space-y-2'>
+          <div className='space-y-2 cursor-pointer'>
             <label className='text-xs uppercase text-gray-400 tracking-widest font-semibold'>
               Details
             </label>
@@ -77,7 +76,7 @@ export const AddTransactionModal = ({ onSuccess }: Props) => {
               placeholder='e.g. Monthly Rent'
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className='bg-white/5 border-white/10 rounded-xl h-12 focus:ring-blue-500'
+              className='bg-white/5 border-white/10 rounded-xl h-12 focus:ring-primary focus:border-primary/90'
             />
           </div>
 
@@ -90,7 +89,7 @@ export const AddTransactionModal = ({ onSuccess }: Props) => {
               placeholder='0.00'
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className='bg-white/5 border-white/10 rounded-xl h-12 text-2xl font-bold'
+              className='bg-white/5 border-white/10 rounded-xl h-12 text-2xl font-bold  focus:ring-primary focus:border-primary/90'
             />
           </div>
 
@@ -102,7 +101,7 @@ export const AddTransactionModal = ({ onSuccess }: Props) => {
           <Button
             onClick={handleSubmit}
             disabled={isSaving}
-            className='w-full bg-blue-600 hover:bg-blue-700 h-12 rounded-xl font-bold text-lg transition-all active:scale-95'
+            className='w-full bg-primary hover:bg-primary/90 h-12 rounded-xl font-bold text-lg transition-all active:scale-95 text-black'
           >
             {isSaving ? 'Syncing with Vault...' : 'Save Transaction'}
           </Button>

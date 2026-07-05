@@ -70,7 +70,7 @@ const AuthForm = ({ mode }: AuthFormProps) => {
           <Button
             onClick={handleSubmit}
             disabled={isLoading}
-            className='w-full h-12 bg-primary hover:bg-primary/90 rounded-xl font-bold text-lg text-black transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer'
+            className='w-full h-12 bg-primary hover:bg-primary/90 rounded-xl font-bold text-lg text-black cursor-pointer'
           >
             {isLoading ? loadingText : buttonText}
           </Button>

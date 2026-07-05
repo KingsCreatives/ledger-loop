@@ -42,10 +42,7 @@ export default function Dashboard() {
             <span>85%</span>
           </div>
           <div className='h-1.5 w-full bg-white/10 rounded-full overflow-hidden'>
-            <div
-              className='h-full bg-blue-500 transition-all duration-1000'
-              style={{ width: '85%' }}
-            ></div>
+            <div className='h-full bg-primary transition-all duration-1000'></div>
           </div>
         </div>
       </div>
