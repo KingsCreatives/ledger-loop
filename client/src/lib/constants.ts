@@ -4,7 +4,7 @@ export const authConstant = {
     buttonText: 'Sign In',
     loadingText: 'Signing in...',
     endpoint: '/auth/login',
-    redirectTo: '/',
+    redirectTo: '/dashboard',
     footer: {
       text: "Don't have an account?",
       linkText: 'Sign up',
@@ -25,3 +25,18 @@ export const authConstant = {
     },
   },
 };
+
+export const howItWorksSteps = [
+  {
+    title: 'Ingest',
+    desc: 'Upload your bank statement and internal ledger as CSV or JSON.',
+  },
+  {
+    title: 'Match',
+    desc: 'LedgerLoop automatically matches transactions by amount, date, and reference.',
+  },
+  {
+    title: 'Report',
+    desc: 'Get a clear reconciliation report with flagged discrepancies.',
+  },
+];

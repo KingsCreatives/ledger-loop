@@ -70,14 +70,14 @@ const AuthForm = ({ mode }: AuthFormProps) => {
           <Button
             onClick={handleSubmit}
             disabled={isLoading}
-            className='w-full h-12 bg-blue-600 hover:bg-blue-700 rounded-xl font-bold text-lg'
+            className='w-full h-12 bg-primary hover:bg-primary/90 rounded-xl font-bold text-lg text-black transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer'
           >
             {isLoading ? loadingText : buttonText}
           </Button>
 
           <p className='text-center text-sm text-gray-400'>
             {footer.text}{' '}
-            <a href={footer.href} className='text-blue-400 hover:underline'>
+            <a href={footer.href} className='text-primary/90 hover:underline'>
               {footer.linkText}
             </a>
           </p>
