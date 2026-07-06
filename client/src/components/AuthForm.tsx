@@ -2,11 +2,13 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import api from '@/lib/axios';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { authConstant } from '@/lib/constants';
 import { useAuth } from '@/context/AuthContext';
+import { Eye, EyeOff } from 'lucide-react';
 
 interface AuthFormProps {
   mode: 'login' | 'signup';
@@ -20,6 +22,7 @@ const AuthForm = ({ mode }: AuthFormProps) => {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [viewPassword, setViewPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -45,7 +48,11 @@ const AuthForm = ({ mode }: AuthFormProps) => {
     <main className='min-h-screen bg-[#0d1117] text-white flex items-center justify-center p-6'>
       <div className='w-full max-w-md space-y-8'>
         <div className='text-center'>
-          <h1 className='text-2xl font-bold tracking-tight'>LedgerLoop</h1>
+          <Link href='/'>
+            <h1 className='text-2xl font-bold tracking-tight cursor-pointer hover:text-primary hover:transform-3d'>
+              LedgerLoop
+            </h1>
+          </Link>
           <p className='text-sm text-gray-400 mt-1'>{title}</p>
         </div>
 
@@ -57,13 +64,30 @@ const AuthForm = ({ mode }: AuthFormProps) => {
             onChange={(e) => setEmail(e.target.value)}
             className='bg-white/5 border-white/10 h-12 rounded-xl'
           />
-          <Input
-            placeholder='Password'
-            type='password'
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className='bg-white/5 border-white/10 h-12 rounded-xl'
-          />
+
+          <div className='relative'>
+            <Input
+              placeholder='Password'
+              type={viewPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className='bg-white/5 border-white/10 h-12 rounded-xl'
+            />
+
+            <div className='absolute right-3 top-3 cursor-pointer'>
+              {viewPassword ? (
+                <EyeOff
+                  onClick={() => setViewPassword(false)}
+                  className='h-5 w-5 text-gray-400'
+                />
+              ) : (
+                <Eye
+                  onClick={() => setViewPassword(true)}
+                  className='h-5 w-5 text-gray-400'
+                />
+              )}
+            </div>
+          </div>
 
           {error && <p className='text-red-400 text-sm'>{error}</p>}
 

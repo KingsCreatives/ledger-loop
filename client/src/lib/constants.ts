@@ -1,8 +1,8 @@
 export const authConstant = {
   login: {
-    title: 'Sign in to your account',
-    buttonText: 'Sign In',
-    loadingText: 'Signing in...',
+    title: 'Log in to your account',
+    buttonText: 'Log In',
+    loadingText: 'Logging in...',
     endpoint: '/auth/login',
     redirectTo: '/dashboard',
     footer: {
@@ -20,7 +20,7 @@ export const authConstant = {
     redirectTo: '/login',
     footer: {
       text: 'Already have an account?',
-      linkText: 'Sign in',
+      linkText: 'Log in',
       href: '/login',
     },
   },
