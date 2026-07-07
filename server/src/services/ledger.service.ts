@@ -89,4 +89,29 @@ export class LedgerService {
   static async listAccounts(userId: string) {
     return await prisma.account.findMany({ where: { userId } });
   }
+
+  static async createAccount(name: string, type: AccountType, userId: string) {
+    return await prisma.account.create({
+      data: { name, type, userId },
+    });
+  }
+
+  static async getAccountTransactions(accountId: string, userId: string) {
+    const account = await prisma.account.findUnique({
+      where: { id: accountId, userId },
+      select: { id: true },
+    });
+
+    if (!account) throw new Error(`No account found, check id again`);
+
+    return prisma.transactionLine.findMany({
+      where: { accountId: account.id },
+      include: {
+        journalEntryLine: {
+          select: { date: true, description: true, id: true },
+        },
+      },
+      orderBy: { journalEntryLine: { date: 'desc' } },
+    });
+  }
 }
