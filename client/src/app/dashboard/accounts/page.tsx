@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import AccountListItem from '@/components/AccountListItem';
 import api from '@/lib/axios';
-import { Button } from '@/components/ui/button';
+import { CreateAccountModal } from '@/components/CreateAccountModal';
+import Link from 'next/link';
 
 interface AccountWithBalance {
   id: string;
@@ -15,26 +16,30 @@ interface AccountWithBalance {
 const Account = () => {
   const [accountList, setAccountLIst] = useState<AccountWithBalance[]>([]);
 
+  const fetchAccounts = async () => {
+    try {
+      const response = await api.get('/ledger/accounts');
+      const accountsWithBalance = await Promise.all(
+        response.data.map(async (account: AccountWithBalance) => {
+          const balanceResponse = await api.get(
+            `/ledger/balance/${account.id}`,
+          );
+          return { ...account, balance: balanceResponse.data.balance };
+        }),
+      );
+      setAccountLIst(accountsWithBalance);
+    } catch (error) {
+      console.error('Failed to fetch accounts:', error);
+    }
+  };
+
   useEffect(() => {
-    const fetchAccounts = async () => {
-      try {
-        const response = await api.get('/ledger/accounts');
-        const accountsWithBalance = await Promise.all(
-          response.data.map(async (account: AccountWithBalance) => {
-            const balanceResponse = await api.get(
-              `/ledger/balance/${account.id}`,
-            );
-            return { ...account, balance: balanceResponse.data.balance };
-          }),
-        );
-        console.log('Accounts with balance:', accountsWithBalance);
-        setAccountLIst(accountsWithBalance);
-      } catch (error) {
-        console.error('Failed to fetch accounts:', error);
-      }
-    };
     fetchAccounts();
   }, []);
+
+  const handleCreateAccountSuccess = () => {
+    fetchAccounts();
+  };
 
   return (
     <div className='max-w-6xl mx-auto space-y-6'>
@@ -45,20 +50,19 @@ const Account = () => {
           <p className='mt-2 text-gray-400'>Manage all your ledger accounts.</p>
         </div>
 
-        <Button className='rounded-full bg-primary px-6 text-black font-bold hover:bg-primary/90'>
-          + Create Account
-        </Button>
+        <CreateAccountModal onSuccess={handleCreateAccountSuccess} />
       </header>
       <div className='space-y-4 mt-8'>
         {accountList.map((account) => {
           return (
-            <AccountListItem
-              key={account.id}
-              id={account.id}
-              name={account.name}
-              type={account.type}
-              balance={account.balance}
-            />
+            <Link href={`/dashboard/accounts/${account.id}`} key={account.id}>
+              <AccountListItem
+                id={account.id}
+                name={account.name}
+                type={account.type}
+                balance={account.balance}
+              />
+            </Link>
           );
         })}
       </div>
