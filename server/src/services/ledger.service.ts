@@ -1,6 +1,7 @@
 import { AccountType, LineType } from '../../generated/prisma/client';
 import { CreateJournalEntryDTO } from '../types';
 import { prisma } from '../utils/prisma';
+import { NotFoundError, ValidationError } from '../utils/errors';
 
 export class LedgerService {
   private static calculateBalance(
@@ -30,7 +31,9 @@ export class LedgerService {
 
   static async createEntry(data: CreateJournalEntryDTO, userId: string) {
     if (data.lines.length < 2) {
-      throw new Error('A journal entry must have at least two transactions');
+      throw new ValidationError(
+        'A journal entry must have at least two transactions',
+      );
     }
 
     let totalDebits = 0;
@@ -45,7 +48,7 @@ export class LedgerService {
     }
 
     if (totalDebits !== totalCredits) {
-      throw new Error(
+      throw new ValidationError(
         `Ledger Imbalance: Debits (${totalDebits}) do not equal Credits(${totalCredits}).`,
       );
     }
@@ -57,7 +60,7 @@ export class LedgerService {
     });
 
     if (accounts.length !== accountIds.length) {
-      throw new Error(
+      throw new ValidationError(
         'One or more account IDs are invalid or do not belong to the user',
       );
     }
@@ -83,18 +86,34 @@ export class LedgerService {
     return await prisma.account.findMany({ where: { userId } });
   }
 
+  static async getAccountBalance(
+    accountId: string,
+    userId: string,
+  ): Promise<number> {
+    if (!accountId) throw new ValidationError('Account ID is required.');
+
+    const account = await prisma.account.findUnique({
+      where: { id: accountId, userId },
+      select: { type: true },
+    });
+
+    if (!account) throw new NotFoundError('Account not found.');
+
+    const { debitSum, creditSum } = await this.getBalanceSums(accountId);
+    return this.calculateBalance(account.type, debitSum, creditSum);
+  }
+
   static async getAccountInfo(accountId: string, userId: string) {
-    if (!accountId) throw new Error('No account Id provided');
+    if (!accountId) throw new ValidationError('No account Id provided');
 
     const account = await prisma.account.findUnique({
       where: { id: accountId, userId },
       select: { id: true, name: true, type: true },
     });
 
-    if (!account) throw new Error(`No account found, check id again`);
+    if (!account) throw new NotFoundError(`No account found, check id again`);
 
-    const { debitSum, creditSum } = await this.getBalanceSums(accountId);
-    const balance = this.calculateBalance(account.type, debitSum, creditSum);
+    const balance = await this.getAccountBalance(accountId, userId);
 
     return {
       id: account.id,
@@ -104,30 +123,13 @@ export class LedgerService {
     };
   }
 
-  static async getAccountBalance(
-    accountId: string,
-    userId: string,
-  ): Promise<number> {
-    if (!accountId) throw new Error('No account Id provided');
-
-    const account = await prisma.account.findUnique({
-      where: { id: accountId, userId },
-      select: { type: true },
-    });
-
-    if (!account) throw new Error(`No account found, check id again`);
-
-    const { debitSum, creditSum } = await this.getBalanceSums(accountId);
-    return this.calculateBalance(account.type, debitSum, creditSum);
-  }
-
   static async getAccountTransactions(accountId: string, userId: string) {
     const account = await prisma.account.findUnique({
       where: { id: accountId, userId },
       select: { id: true },
     });
 
-    if (!account) throw new Error(`No account found, check id again`);
+    if (!account) throw new NotFoundError(`No account found, check id again`);
 
     return prisma.transactionLine.findMany({
       where: { accountId: account.id },

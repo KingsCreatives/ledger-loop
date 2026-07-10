@@ -17,6 +17,13 @@ interface AccountHistoryProp {
   };
 }
 
+interface AccountInfo {
+  id: string;
+  name: string;
+  type: 'ASSETS' | 'REVENUE' | 'EXPENSE' | 'LIABILITIES' | 'EQUITY';
+  balance: number;
+}
+
 export default function AccountDetailsPage({
   params,
 }: {
@@ -24,15 +31,18 @@ export default function AccountDetailsPage({
 }) {
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState<AccountHistoryProp[]>([]);
+  const [account, setAccount] = useState<AccountInfo | null>(null);
 
   useEffect(() => {
     const fetchTransactions = async () => {
       setIsLoading(true);
       try {
-        const response = await api.get(
-          `/ledger/accounts/${params.accountId}/transactions`,
-        );
-        setTransactions(response.data);
+        const [accountResponse, transactionResponse] = await Promise.all([
+          api.get(`/ledger/accounts/${params.accountId}`),
+          api.get(`/ledger/accounts/${params.accountId}/transactions`),
+        ]);
+        setAccount(accountResponse.data);
+        setTransactions(transactionResponse.data);
       } catch (error) {
         console.error('Failed to fetch accounts:', error);
       } finally {

@@ -13,5 +13,6 @@ ledgerRouter.get(
   '/accounts/:accountId/transactions',
   LedgerController.getAccountTransactions,
 );
+ledgerRouter.get('/accounts/:accountId', LedgerController.getAccountDetails);
 
 export default ledgerRouter;
