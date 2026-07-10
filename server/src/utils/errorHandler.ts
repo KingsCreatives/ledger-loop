@@ -12,8 +12,7 @@ export const errorHandler = (
     return res.status(error.statusCode).json({ message: error.message });
   }
 
-  return res.status(StatusCodes.BAD_REQUEST).json({
-    message:
-      error instanceof Error ? error.message : 'An unexpected error occurred',
+  return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
+    message: 'An unexpected error occurred',
   });
 };
