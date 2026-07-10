@@ -5,6 +5,7 @@ import { createClient } from 'redis';
 import cors from 'cors';
 
 import v1Router from './routes/v1';
+import { errorHandler } from './utils/errorHandler';
 
 const redisClient = createClient({
   socket: { host: 'localhost', port: 6379 },
@@ -33,11 +34,12 @@ app.use(
     cookie: {
       secure: false,
       httpOnly: true,
-      maxAge: 1000 * 60 * 60 * 24,  
+      maxAge: 1000 * 60 * 60 * 24,
     },
   }),
 );
 
 app.use('/api/v1', v1Router);
+app.use(errorHandler);
 
 export default app;
