@@ -101,9 +101,12 @@ const AuthForm = ({ mode }: AuthFormProps) => {
 
           <p className='text-center text-sm text-gray-400'>
             {footer.text}{' '}
-            <a href={footer.href} className='text-primary/90 hover:underline'>
+            <Link
+              href={footer.href}
+              className='inline-block rounded-full border border-white/20 px-4 py-2 font-bold text-sm transition hover:bg-white/10 ml-1'
+            >
               {footer.linkText}
-            </a>
+            </Link>
           </p>
         </div>
       </div>

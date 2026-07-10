@@ -55,7 +55,7 @@ const Account = () => {
       <div className='space-y-4 mt-8'>
         {accountList.map((account) => {
           return (
-            <Link href={`/dashboard/accounts/${account.id}`} key={account.id}>
+            <Link href={`/dashboard/accounts/${account.id}`} key={account.id} className='block'>
               <AccountListItem
                 id={account.id}
                 name={account.name}

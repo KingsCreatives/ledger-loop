@@ -1,3 +1,10 @@
+interface AccountListItemProps {
+  id: string;
+  name: string;
+  type: 'ASSETS' | 'LIABILITIES' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
+  balance: number;
+}
+
 export const authConstant = {
   login: {
     title: 'Log in to your account',
@@ -40,3 +47,11 @@ export const howItWorksSteps = [
     desc: 'Get a clear reconciliation report with flagged discrepancies.',
   },
 ];
+
+export const typeStyles: Record<AccountListItemProps['type'], string> = {
+  ASSETS: 'bg-emerald-500/15 text-emerald-400',
+  LIABILITIES: 'bg-red-500/15 text-red-400',
+  EQUITY: 'bg-blue-500/15 text-blue-400',
+  REVENUE: 'bg-purple-500/15 text-purple-400',
+  EXPENSE: 'bg-amber-500/15 text-amber-400',
+};
