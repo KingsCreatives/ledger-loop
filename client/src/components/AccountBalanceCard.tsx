@@ -10,7 +10,7 @@ interface Props {
   refreshTrigger: number;
 }
 
-const BalanceCard = ({ accountId, refreshTrigger }: Props) => {
+const AccountBalanceCard = ({ accountId, refreshTrigger }: Props) => {
   const [balance, setBalance] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -37,13 +37,12 @@ const BalanceCard = ({ accountId, refreshTrigger }: Props) => {
   }
 
   return (
-    <div className='mt-4 flex items-baseline gap-2'>
+    <div className='mt-4 pt-2 flex items-baseline gap-2'>
       <span className='text-5xl font-extrabold tracking-tighter'>
-        {balance !== null ? formatCurrency(balance) : '$0.00'}
+        {balance !== null ? formatCurrency(balance) : formatCurrency(0)}
       </span>
-      <span className='text-green-400 text-sm font-bold'>+2.5%</span>
     </div>
   );
 };
 
-export default BalanceCard;
+export default AccountBalanceCard;

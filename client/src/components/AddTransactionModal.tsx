@@ -24,12 +24,23 @@ export const AddTransactionModal = ({ onSuccess }: Props) => {
   const [fromAccount, setFromAccount] = useState('');
   const [toAccount, setToAccount] = useState('');
 
+  const resetForm = () => {
+    setDescription('');
+    setAmount('');
+    setFromAccount('');
+    setToAccount('');
+  };
+
   const handleSubmit = async () => {
     if (!description || !amount || !fromAccount || !toAccount) return;
 
-    setIsSaving(true);
-
     const amountInCents = Math.round(parseFloat(amount) * 100);
+
+    if (!Number.isFinite(amountInCents) || amountInCents < 1) {
+      return;
+    }
+
+    setIsSaving(true);
 
     const payload = {
       description,
@@ -43,9 +54,8 @@ export const AddTransactionModal = ({ onSuccess }: Props) => {
     try {
       await api.post('/ledger', payload);
       setOpen(false);
-      setDescription('');
-      setAmount('');
       onSuccess();
+      resetForm();
     } catch (error) {
       console.error('Transaction failed', error);
     } finally {
@@ -54,7 +64,16 @@ export const AddTransactionModal = ({ onSuccess }: Props) => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(isOpen) => {
+        setOpen(isOpen);
+
+        if (!isOpen) {
+          resetForm();
+        }
+      }}
+    >
       <DialogTrigger asChild>
         <Button className='px-6 py-2.5 bg-white text-black rounded-full font-bold text-sm hover:bg-gray-200 transition cursor-pointer'>
           Add Transaction
