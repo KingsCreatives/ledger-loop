@@ -13,49 +13,101 @@ enum AccountType {
   EQUITY
   REVENUE
   EXPENSE
- }
+}
 
 enum LineType {
   DEBIT
   CREDIT
 }
 
+enum ImportStatus {
+  UPLOADED
+  VALIDATED
+  COMMITTED
+  FAILED
+}
+
 model User {
- id  String @id @default(uuid())
- email String @unique
- password String
- accounts Account[]
- createdAt DateTime @default(now())
+  id            String        @id @default(uuid())
+  email         String        @unique
+  password      String
+  accounts      Account[]
+  importBatches ImportBatch[]
+  createdAt     DateTime      @default(now())
 }
 
 model Account {
- id  String @id @default(uuid())
- name String
- type AccountType
- user   User  @relation(fields: [userId], references: [id])
- userId String  
- lines TransactionLine[]
- createdAt DateTime @default(now())
- updatedAt DateTime @updatedAt
-}
+  id   String      @id @default(uuid())
+  name String
+  type AccountType
 
-model JournalEntry{
-  id String @id @default(uuid())
-  date DateTime 
-  description String
-  lines TransactionLine []
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  lines         TransactionLine[]
+  importBatches ImportBatch[]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
-model TransactionLine{
-  id String @id @default(uuid())
+model JournalEntry {
+  id          String   @id @default(uuid())
+  date        DateTime
+  description String
+
+  lines TransactionLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TransactionLine {
+  id     String   @id @default(uuid())
   amount Int
-  type LineType
+  type   LineType
+
   journalEntryLine JournalEntry @relation(fields: [journalEntryId], references: [id])
-  journalEntryId String
+  journalEntryId   String
+
   accountEntry Account @relation(fields: [accountId], references: [id])
+  accountId    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ImportBatch {
+  id String @id @default(uuid())
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  account   Account @relation(fields: [accountId], references: [id])
   accountId String
+
+  importRows ImportRow[]
+
+  filename String
+  status   ImportStatus @default(UPLOADED)
+
+  createdAt DateTime @default(now())
+}
+
+model ImportRow {
+  id String @id @default(uuid())
+
+  batch   ImportBatch @relation(fields: [batchId], references: [id])
+  batchId String
+
+  rowNumber   Int
+  date        DateTime
+  description String
+  amount      Int
+
+  isValid      Boolean @default(false)
+  errorMessage String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
