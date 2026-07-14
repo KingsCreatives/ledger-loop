@@ -1,5 +1,5 @@
 import { AccountType, LineType } from '../../generated/prisma/client';
-import { CreateJournalEntryDTO } from '../types';
+import { CreateJournalEntryDTO } from '../types/ledger.types';
 import { prisma } from '../utils/prisma';
 import { NotFoundError, ValidationError } from '../utils/errors';
 

@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt';
 import { prisma } from '../utils/prisma';
-import { AuthUser, PublicUser } from '../types';
+import { AuthUser, PublicUser } from '../types/auth.type';
 import {
   ValidationError,
   ConflictError,
