@@ -1,5 +1,6 @@
-import multer, { FileFilterCallback } from 'multer';
 import { Request } from 'express';
+import multer, { FileFilterCallback } from 'multer';
+import { ValidationError } from './errors';
 
 const storage = multer.memoryStorage();
 
@@ -16,7 +17,7 @@ const upload = multer({
     if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
       cb(null, true);
     } else {
-      cb(new Error('Only CSV files are allowed'));
+      cb(new ValidationError('Only CSV files are allowed'));
     }
   },
 });

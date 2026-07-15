@@ -12,11 +12,13 @@ export class ImportController {
           message: 'failed to upload file',
         });
       }
+
       const rows = await ImportService.parseCSV(file.buffer);
+      const { validRows, errors } = ImportService.validateRows(rows);
 
       return res.status(StatusCodes.OK).json({
-        filename: file.originalname,
-        rows,
+        validRows,
+        errors,
       });
     } catch (error) {
       console.error(error);
