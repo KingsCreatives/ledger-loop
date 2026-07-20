@@ -6,9 +6,9 @@ services:
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "5435:5432"
+      - '5435:5432'
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     restart: unless-stopped
 
   pgweb:
@@ -18,7 +18,7 @@ services:
     environment:
       PGWEB_DATABASE_URL: postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}?sslmode=disable
     ports:
-      - "8085:8081"
+      - '8085:8081'
     restart: unless-stopped
 
   redis:
@@ -27,7 +27,7 @@ services:
     volumes:
       - redis_data:/data
     ports:
-      - "6379:6379"
+      - '6379:6379'
     restart: unless-stopped
 
   redis-commander:
@@ -37,7 +37,7 @@ services:
       - HTTP_USER=${REDIS_UI_USER}
       - HTTP_PASSWORD=${REDIS_UI_PASSWORD}
     ports:
-      - "8081:8081"
+      - '8081:8081'
     depends_on:
       - redis
     restart: unless-stopped
