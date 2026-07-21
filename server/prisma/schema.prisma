@@ -101,9 +101,9 @@ model ImportRow {
   batchId String
 
   rowNumber   Int
-  date        DateTime
-  description String
-  amount      Int
+  date        DateTime?
+  description String?
+  amount      Int?
 
   isValid      Boolean @default(false)
   errorMessage String?
