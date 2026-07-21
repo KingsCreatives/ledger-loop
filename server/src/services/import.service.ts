@@ -2,6 +2,8 @@ import csvParser from 'csv-parser';
 import { Readable } from 'node:stream';
 import { ParsedCsvRow, ValidatedImportRow } from '../types/import.types';
 import { validateRowSchema } from '../schemas/import.schema';
+import { prisma } from '../utils/prisma';
+import { ImportStatus } from '../../generated/prisma/enums';
 
 export class ImportService {
   static async parseCSV(buffer: Buffer): Promise<ParsedCsvRow[]> {
@@ -18,10 +20,10 @@ export class ImportService {
 
   static validateRows(rows: ParsedCsvRow[]): {
     validRows: ValidatedImportRow[];
-    errors: { row: number; message: string }[];
+    errors: { row: number; message: string; raw: ParsedCsvRow }[];
   } {
     const validRows: ValidatedImportRow[] = [];
-    const errors: { row: number; message: string }[] = [];
+    const errors: { row: number; message: string; raw: ParsedCsvRow }[] = [];
 
     rows.forEach((row, index) => {
       const result = this.validateRow(row, index + 1);
@@ -32,6 +34,7 @@ export class ImportService {
         errors.push({
           row: index + 1,
           message: result.error ?? 'Unknown validation error',
+          raw: row,
         });
       }
     });
@@ -73,7 +76,7 @@ export class ImportService {
     return {
       date: new Date(row.date),
       description: row.description?.trim(),
-      amount: row.amount ? Number(row.amount) : 0,
+      amount: row.amount ? Math.round(Number(row.amount) * 100) : 0,
     };
   }
 
@@ -81,5 +84,56 @@ export class ImportService {
     return errors
       .map((err) => `${err.path.join('.') || 'root'}: ${err.message}`)
       .join('; ');
+  }
+
+  static async stageImport(params: {
+    userId: string;
+    accountId: string;
+    filename: string;
+    validRows: ValidatedImportRow[];
+    errors: { row: number; message: string; raw: ParsedCsvRow }[];
+  }) {
+    const { userId, accountId, filename, validRows, errors } = params;
+
+    return prisma.$transaction(async (tx) => {
+      const batch = await tx.importBatch.create({
+        data: {
+          userId,
+          accountId,
+          filename,
+          status: ImportStatus.VALIDATED,
+        },
+      });
+
+      const validRowData = validRows.map((row) => ({
+        batchId: batch.id,
+        rowNumber: row.rowNumber,
+        date: row.date,
+        description: row.description,
+        amount: row.amount,
+        isValid: true,
+      }));
+
+      const invalidRowData = errors.map((err) => ({
+        batchId: batch.id,
+        rowNumber: err.row,
+        date: isNaN(new Date(err.raw.date).getTime())
+          ? null
+          : new Date(err.raw.date),
+        description: err.raw.description?.trim() || null,
+        amount:
+          err.raw.amount && !isNaN(Number(err.raw.amount))
+            ? Math.round(Number(err.raw.amount) * 100)
+            : null,
+        isValid: false,
+        errorMessage: err.message,
+      }));
+
+      await tx.importRow.createMany({
+        data: [...validRowData, ...invalidRowData],
+      });
+
+      return batch;
+    });
   }
 }
