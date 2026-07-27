@@ -4,6 +4,7 @@ allowBuilds:
   esbuild: false
   gitflow: false
   prisma: false
+  unrs-resolver: false
 ignoredBuiltDependencies:
   - '@prisma/engines'
   - prisma

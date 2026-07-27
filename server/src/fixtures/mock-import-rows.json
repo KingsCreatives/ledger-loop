@@ -1,0 +1,92 @@
+[
+  {
+    "id": "a1b2c3d4-0001-4a1a-8b1a-000000000001",
+    "rowNumber": 1,
+    "date": "2026-07-07",
+    "description": "Client deposit payment",
+    "amount": 570213,
+    "isValid": true,
+    "errorMessage": null
+  },
+  {
+    "id": "a1b2c3d4-0002-4a1a-8b1a-000000000002",
+    "rowNumber": 2,
+    "date": "2025-12-09",
+    "description": "Office supplies purchase",
+    "amount": -409332,
+    "isValid": true,
+    "errorMessage": null
+  },
+  {
+    "id": "a1b2c3d4-0003-4a1a-8b1a-000000000003",
+    "rowNumber": 3,
+    "date": "2025-08-31",
+    "description": "Consulting fee received",
+    "amount": 693737,
+    "isValid": true,
+    "errorMessage": null
+  },
+  {
+    "id": "a1b2c3d4-0004-4a1a-8b1a-000000000004",
+    "rowNumber": 4,
+    "date": "2025-10-08",
+    "description": "Software subscription renewal",
+    "amount": -241903,
+    "isValid": true,
+    "errorMessage": null
+  },
+  {
+    "id": "a1b2c3d4-0005-4a1a-8b1a-000000000005",
+    "rowNumber": 5,
+    "date": "2025-08-07",
+    "description": "Refund from vendor",
+    "amount": 62984,
+    "isValid": true,
+    "errorMessage": null
+  },
+  {
+    "id": "a1b2c3d4-0006-4a1a-8b1a-000000000006",
+    "rowNumber": 6,
+    "date": "2025-01-04",
+    "description": "Equipment rental payment",
+    "amount": -359553,
+    "isValid": true,
+    "errorMessage": null
+  },
+  {
+    "id": "a1b2c3d4-0007-4a1a-8b1a-000000000007",
+    "rowNumber": 7,
+    "date": "2025-11-28",
+    "description": "Invoice payment from client",
+    "amount": 506202,
+    "isValid": true,
+    "errorMessage": null
+  },
+  {
+    "id": "a1b2c3d4-0008-4a1a-8b1a-000000000008",
+    "rowNumber": 8,
+    "date": "2025-05-12",
+    "description": "Utility bill payment",
+    "amount": -370795,
+    "isValid": true,
+    "errorMessage": null
+  },
+  {
+    "id": "a1b2c3d4-0009-4a1a-8b1a-000000000009",
+    "rowNumber": 9,
+    "date": "2025-08-24",
+    "description": "Interest income",
+    "amount": 82990,
+    "isValid": true,
+    "errorMessage": null
+  },
+  {
+    "id": "a1b2c3d4-0010-4a1a-8b1a-000000000010",
+    "rowNumber": 10,
+    "date": "2026-04-22",
+    "description": "Bank service charge",
+    "amount": -67789,
+    "isValid": true,
+    "errorMessage": null
+  }
+]

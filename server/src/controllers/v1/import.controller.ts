@@ -3,7 +3,6 @@ import { StatusCodes } from 'http-status-codes';
 import { ImportService } from '../../services/import.service';
 
 export class ImportController {
-
   static async parse(req: Request, res: Response) {
     try {
       const file = req.file;
@@ -15,7 +14,7 @@ export class ImportController {
       }
 
       const userId = req.session.userId!;
-      const {accountId} = req.body
+      const { accountId } = req.body;
 
       const rows = await ImportService.parseCSV(file.buffer);
       const { validRows, errors } = ImportService.validateRows(rows);
@@ -23,10 +22,10 @@ export class ImportController {
       const batch = await ImportService.stageImport({
         userId,
         accountId,
-        filename : file.originalname,
+        filename: file.originalname,
         validRows,
-        errors
-      })
+        errors,
+      });
 
       return res.status(StatusCodes.OK).json({
         batchId: batch.id,
@@ -41,5 +40,17 @@ export class ImportController {
         message: error instanceof Error ? error.message : error,
       });
     }
+  }
+
+  static async commit(req: Request, res: Response) {
+    const { batchId, offsetAccountId } = req.body;
+
+    const result = await ImportService.commitImport(
+      batchId,
+      offsetAccountId,
+      req.session.userId!,
+    );
+
+    return res.status(StatusCodes.OK).json(result);
   }
 }
