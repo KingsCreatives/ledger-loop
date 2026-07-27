@@ -6,7 +6,7 @@
 
     "module": "nodenext",
     "target": "esnext",
-    "types": ["node"],
+    "types": ["node", "jest"],
     "lib": ["esnext"],
 
     // Other Outputs
