@@ -2,6 +2,7 @@ import { AccountType, LineType } from '../../generated/prisma/client';
 import { CreateJournalEntryDTO } from '../types/ledger.types';
 import { prisma } from '../utils/prisma';
 import { NotFoundError, ValidationError } from '../utils/errors';
+import { Prisma } from '../../generated/prisma/browser';
 
 export class LedgerService {
   private static calculateBalance(
@@ -29,12 +30,15 @@ export class LedgerService {
     return { debitSum, creditSum };
   }
 
-  static async createEntry(data: CreateJournalEntryDTO, userId: string) {
+  static async createEntry(data: CreateJournalEntryDTO, userId: string, tx?: Prisma.TransactionClient) {
+
     if (data.lines.length < 2) {
       throw new ValidationError(
         'A journal entry must have at least two transactions',
       );
     }
+
+    const db = tx ?? prisma;
 
     let totalDebits = 0;
     let totalCredits = 0;
@@ -55,7 +59,7 @@ export class LedgerService {
 
     const accountIds = data.lines.map((line) => line.accountId);
 
-    const accounts = await prisma.account.findMany({
+    const accounts = await db.account.findMany({
       where: { id: { in: accountIds }, userId },
     });
 
@@ -65,7 +69,7 @@ export class LedgerService {
       );
     }
 
-    const newEntry = await prisma.journalEntry.create({
+    const newEntry = await db.journalEntry.create({
       data: {
         date: data.date,
         description: data.description,
