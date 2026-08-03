@@ -211,31 +211,33 @@ export class ImportService {
     offsetAccountId: string,
     userId: string,
   ) {
+    
     const batch = await this.loadImportBatch(batchId, userId);
 
-    for (const row of batch.importRows) {
-      const dto = this.buildJournalEntryDTO(
-        row,
-        batch.accountId,
-        offsetAccountId,
-      );
+    return prisma.$transaction(async (tx) => {
+      for (const row of batch.importRows) {
+        const dto = this.buildJournalEntryDTO(
+          row,
+          batch.accountId,
+          offsetAccountId,
+        );
 
-      await LedgerService.createEntry(dto, userId);
-    }
+        await LedgerService.createEntry(dto, userId, tx);
+      }
 
-    await prisma.importBatch.update({
-      where: {
-        id: batch.id,
-      },
-      data: {
+      await tx.importBatch.update({
+        where: {
+          id: batch.id,
+        },
+        data: {
+          status: ImportStatus.COMMITTED,
+        },
+      });
+      return {
+        batchId: batch.id,
+        imported: batch.importRows.length,
         status: ImportStatus.COMMITTED,
-      },
+      };
     });
-
-    return {
-      batchId: batch.id,
-      imported: batch.importRows.length,
-      status: ImportStatus.COMMITTED,
-    };
   }
 }
