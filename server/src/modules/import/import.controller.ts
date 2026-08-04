@@ -1,20 +1,21 @@
-import { Request, Response } from 'express';
+import { Request, Response, RequestHandler } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { ImportService } from '../../services/import.service';
+import { asyncHandler } from '../../shared/utils/asyncHandler';
+import { ImportService } from './import.service';
 
 export class ImportController {
-  static async parse(req: Request, res: Response) {
-    try {
+  static parse: RequestHandler = asyncHandler(
+    async (req: Request, res: Response) => {
       const file = req.file;
 
       if (!file) {
         return res.status(StatusCodes.BAD_REQUEST).json({
-          message: 'failed to upload file',
+          message: 'Failed to upload file',
         });
       }
 
-      const userId = req.session.userId!;
       const { accountId } = req.body;
+      const userId = req.session.userId!;
 
       const rows = await ImportService.parseCSV(file.buffer);
       const { validRows, errors } = ImportService.validateRows(rows);
@@ -34,23 +35,20 @@ export class ImportController {
         errorCount: errors.length,
         errors,
       });
-    } catch (error) {
-      console.error(error);
-      return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-        message: error instanceof Error ? error.message : error,
-      });
-    }
-  }
+    },
+  );
 
-  static async commit(req: Request, res: Response) {
-    const { batchId, offsetAccountId } = req.body;
+  static commit: RequestHandler = asyncHandler(
+    async (req: Request, res: Response) => {
+      const { batchId, offsetAccountId } = req.body;
 
-    const result = await ImportService.commitImport(
-      batchId,
-      offsetAccountId,
-      req.session.userId!,
-    );
+      const result = await ImportService.commitImport(
+        batchId,
+        offsetAccountId,
+        req.session.userId!,
+      );
 
-    return res.status(StatusCodes.OK).json(result);
-  }
+      return res.status(StatusCodes.OK).json(result);
+    },
+  );
 }

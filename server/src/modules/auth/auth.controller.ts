@@ -1,10 +1,9 @@
 import { Request, Response, RequestHandler } from 'express';
-import { AuthService } from '../../services/auth.service';
+import { AuthService } from './auth.service';
 import { StatusCodes } from 'http-status-codes';
-import { asyncHandler } from '../../utils/asyncHandler';
+import { asyncHandler } from '../../shared/utils/asyncHandler';
 
 export class AuthController {
-  
   static create: RequestHandler = asyncHandler(
     async (req: Request, res: Response) => {
       const { email, password } = req.body;

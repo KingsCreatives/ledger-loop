@@ -1,10 +1,10 @@
 import { ImportService } from './import.service';
-import { prisma } from '../utils/prisma';
-import { LedgerService } from './ledger.service';
-import { ImportStatus, LineType } from '../../generated/prisma/enums';
-import mockRows from '../fixtures/mock-import-rows.json';
+import { prisma } from '../../shared/utils/prisma';
+import { LedgerService } from '../ledger/ledger.service';
+import { ImportStatus, LineType } from '../../../generated/prisma/enums';
+import mockRows from '../../fixtures/mock-import-rows.json';
 
-jest.mock('../utils/prisma', () => ({
+jest.mock('../../shared/utils/prisma', () => ({
   prisma: {
     importBatch: {
       findFirst: jest.fn(),

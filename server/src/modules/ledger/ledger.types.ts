@@ -1,4 +1,4 @@
-import { LineType } from '../../generated/prisma/client';
+import { LineType } from '../../../generated/prisma/client';
 
 export interface CreateTransactionLineDTO {
   accountId: string;
@@ -11,4 +11,3 @@ export interface CreateJournalEntryDTO {
   description: string;
   lines: CreateTransactionLineDTO[];
 }
-

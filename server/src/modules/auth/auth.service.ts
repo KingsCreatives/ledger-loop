@@ -1,12 +1,12 @@
 import bcrypt from 'bcrypt';
-import { prisma } from '../utils/prisma';
-import { AuthUser, PublicUser } from '../types/auth.type';
+import { prisma } from '../../shared/utils/prisma';
+import { AuthUser, PublicUser } from './auth.type';
 import {
   ValidationError,
   ConflictError,
   UnauthorizedError,
-} from '../utils/errors';
-import { signupSchema } from '../schemas/auth.schema';
+} from '../../shared/utils/errors';
+import { signupSchema } from './auth.schema';
 
 export class AuthService {
   static async hashPassword(password: string): Promise<string> {
