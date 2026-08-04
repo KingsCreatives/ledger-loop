@@ -1,21 +1,12 @@
 import { Request, Response, RequestHandler } from 'express';
-import { LedgerService } from '../../services/ledger.service';
-import { createAccountSchema } from '../../schemas/account.schema';
+import { AccountService } from './account.service';
+import { createAccountSchema } from './account.schema';
 import { AccountType } from '../../../generated/prisma/enums';
 import { StatusCodes } from 'http-status-codes';
-import { asyncHandler } from '../../utils/asyncHandler';
-import { getAccountId } from '../../utils/getAccountId';
-export class LedgerController {
-  static create: RequestHandler = asyncHandler(
-    async (req: Request, res: Response) => {
-      const newEntry = await LedgerService.createEntry(
-        req.body,
-        req.session.userId!,
-      );
-      return res.status(StatusCodes.CREATED).json(newEntry);
-    },
-  );
+import { asyncHandler } from '../../shared/utils/asyncHandler';
+import { getAccountId } from '../../shared/utils/getAccountId';
 
+export class AccountController {
   static createAccount: RequestHandler = asyncHandler(
     async (req: Request, res: Response) => {
       const parsed = createAccountSchema.safeParse(req.body);
@@ -25,7 +16,7 @@ export class LedgerController {
         });
       }
 
-      const account = await LedgerService.createAccount(
+      const account = await AccountService.createAccount(
         parsed.data.name,
         parsed.data.type as AccountType,
         req.session.userId!,
@@ -36,15 +27,15 @@ export class LedgerController {
 
   static getAccounts: RequestHandler = asyncHandler(
     async (req: Request, res: Response) => {
-      const accounts = await LedgerService.listAccounts(req.session.userId!);
+      const accounts = await AccountService.listAccounts(req.session.userId!);
       return res.status(StatusCodes.OK).json(accounts);
     },
   );
 
-  static getBalance: RequestHandler = asyncHandler(
+  static getAccountBalance: RequestHandler = asyncHandler(
     async (req: Request, res: Response) => {
       const accountId = getAccountId(req);
-      const accountBalance = await LedgerService.getAccountBalance(
+      const accountBalance = await AccountService.getAccountBalance(
         accountId,
         req.session.userId!,
       );
@@ -58,7 +49,7 @@ export class LedgerController {
   static getAccountDetails: RequestHandler = asyncHandler(
     async (req: Request, res: Response) => {
       const accountId = getAccountId(req);
-      const details = await LedgerService.getAccountInfo(
+      const details = await AccountService.getAccountInfo(
         accountId,
         req.session.userId!,
       );
@@ -70,7 +61,7 @@ export class LedgerController {
   static getAccountTransactions: RequestHandler = asyncHandler(
     async (req: Request, res: Response) => {
       const accountId = getAccountId(req);
-      const transactions = await LedgerService.getAccountTransactions(
+      const transactions = await AccountService.getAccountTransactions(
         accountId,
         req.session.userId!,
       );

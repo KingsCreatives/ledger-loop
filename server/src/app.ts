@@ -4,8 +4,8 @@ import { RedisStore } from 'connect-redis';
 import { createClient } from 'redis';
 import cors from 'cors';
 
-import v1Router from './routes/v1';
-import { errorHandler } from './utils/errorHandler';
+import v1Router from '../src/api/v1';
+import { errorHandler } from '../src/shared/utils/errorHandler';
 
 const redisClient = createClient({
   socket: { host: 'localhost', port: 6379 },

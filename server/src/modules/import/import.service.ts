@@ -1,9 +1,14 @@
 import csvParser from 'csv-parser';
 import { Readable } from 'node:stream';
-import { ParsedCsvRow, ValidatedImportRow } from '../types/import.types';
-import { validateRowSchema } from '../schemas/import.schema';
-import { prisma } from '../utils/prisma';
-import { ImportStatus } from '../../generated/prisma/enums';
+import { ParsedCsvRow, ValidatedImportRow } from './import.types';
+import { validateRowSchema } from './import.schema';
+import { prisma } from '../../shared/utils/prisma';
+import { ImportStatus } from '../../../generated/prisma/enums';
+import { NotFoundError, ValidationError } from '../../shared/utils/errors';
+import { LineType } from '../../../generated/prisma/enums';
+import { CreateJournalEntryDTO } from '../../modules/ledger/ledger.types';
+import { LedgerService } from '../ledger/ledger.service';
+import { ImportRow } from '../../../generated/prisma/client';
 
 export class ImportService {
   static async parseCSV(buffer: Buffer): Promise<ParsedCsvRow[]> {
@@ -134,6 +139,104 @@ export class ImportService {
       });
 
       return batch;
+    });
+  }
+
+  static async loadImportBatch(batchId: string, userId: string) {
+    const batch = await prisma.importBatch.findFirst({
+      where: {
+        id: batchId,
+        userId,
+      },
+      include: {
+        importRows: {
+          where: {
+            isValid: true,
+          },
+        },
+      },
+    });
+
+    if (!batch) {
+      throw new NotFoundError("Batch doesn't exist");
+    }
+
+    return batch;
+  }
+
+  private static buildJournalEntryDTO(
+    row: ImportRow,
+    accountId: string,
+    offsetAccountId: string,
+  ): CreateJournalEntryDTO {
+    if (!row.date || !row.description || row.amount === null) {
+      throw new ValidationError('Invalid import row');
+    }
+    const isMoneyIn = row.amount > 0;
+    const amount = Math.abs(row.amount);
+
+    return {
+      date: row.date,
+      description: row.description,
+      lines: isMoneyIn
+        ? [
+            {
+              accountId,
+              type: LineType.DEBIT,
+              amount,
+            },
+            {
+              accountId: offsetAccountId,
+              type: LineType.CREDIT,
+              amount,
+            },
+          ]
+        : [
+            {
+              accountId: offsetAccountId,
+              type: LineType.DEBIT,
+              amount,
+            },
+            {
+              accountId,
+              type: LineType.CREDIT,
+              amount,
+            },
+          ],
+    };
+  }
+
+  static async commitImport(
+    batchId: string,
+    offsetAccountId: string,
+    userId: string,
+  ) {
+    const batch = await this.loadImportBatch(batchId, userId);
+
+    return prisma.$transaction(async (tx) => {
+      for (const row of batch.importRows) {
+        const dto = this.buildJournalEntryDTO(
+          row,
+          batch.accountId,
+          offsetAccountId,
+        );
+
+        await LedgerService.createEntry(dto, userId, tx);
+      }
+
+      await tx.importBatch.update({
+        where: {
+          id: batch.id,
+        },
+        data: {
+          status: ImportStatus.COMMITTED,
+        },
+      });
+      return {
+        batchId: batch.id,
+        imported: batch.importRows.length,
+        status: ImportStatus.COMMITTED,
+      };
     });
   }
 }
