@@ -1,10 +1,10 @@
 <div align="center">
 
-# LedgerLoop 🔄
+# LedgerLoop 
 
-### Automated Bank Reconciliation Engine
+### Double-Entry Bookkeeping with Automated Bank Reconciliation
 
-**Stop reconciling manually. Let the engine do it.**
+**Upload a bank statement. LedgerLoop reconciles it against your ledger.**
 
 [![Status](https://img.shields.io/badge/Status-In%20Development-orange?style=flat-square)](https://github.com/KingsCreatives/ledger-loop)
 [![TypeScript](https://img.shields.io/badge/TypeScript-97%25-3178C6?style=flat-square&logo=typescript)](https://github.com/KingsCreatives/ledger-loop)
@@ -15,137 +15,122 @@
 
 ---
 
-## 💡 The Problem
+## The Problem
 
-Every finance team knows the pain. At the end of the month, an accountant opens two spreadsheets — the bank statement and the internal ledger — and manually compares them line by line. Hundreds of transactions. Hours of work. One misplaced decimal ruins everything.
+Every finance team knows the pain. At the end of the month, an accountant opens two spreadsheets, the bank statement, the internal ledger and manually compares them line by line. Hundreds of transactions. Hours of work. One misplaced decimal ruins everything.
 
-> I've done this myself, reconciling **GHC 80M+ in daily vault transactions** at Ghana Commercial Bank. I built LedgerLoop because I know exactly how broken this process is.
+> I've done this myself, reconciling **GHC 80M+ in daily vault transactions** at Ghana Commercial Bank. LedgerLoop is built from that experience, not a tutorial.
 
-LedgerLoop eliminates that entirely. Feed it your bank statement and your ledger. It does the rest.
-
----
-
-## ✨ What It Does
-
-```
-Bank Statement (CSV/JSON)  ──┐
-                              ├──▶  LedgerLoop Engine  ──▶  Reconciliation Report
-Internal Ledger (CSV/JSON)  ──┘
-```
-
-- 📥 **Ingests** bank statement data and internal ledger records (CSV or JSON)
-- 🔍 **Matches** transactions automatically by amount, date, and reference number
-- 🚩 **Flags** unmatched entries, duplicates, and suspicious discrepancies
-- 📊 **Reports** match rate, total discrepancy value, and exception summary
-- ⚡ **Saves** hours of manual work per reconciliation cycle
+LedgerLoop is a full-stack personal/small-business finance app built around proper **double-entry bookkeeping**, with bank statement import and automated reconciliation as its core, differentiating feature.
 
 ---
 
-## 🛠️ Tech Stack
+##  What It Does Today
 
-| Layer | Technology | Purpose |
-|---|---|---|
-| Language | TypeScript | Type-safe financial logic |
-| Runtime | Node.js | Server-side processing |
-| Data Ingestion | Custom Parser | CSV & JSON support |
-| Matching Engine | Custom Algorithm | Multi-factor transaction matching |
-| Output | JSON / CSV | Reconciliation reports |
-| API Layer | Express (planned) | REST endpoints |
-| Dashboard | TBD | Visual reconciliation UI |
+- **Multi-user auth** — session-based signup/login, every ledger query scoped to the logged-in user
+- **Double-entry ledger** — accounts (Assets, Liabilities, Equity, Revenue, Expense), balanced journal entries, running balances
+- **CSV import pipeline** — upload a bank statement, rows are parsed and validated (Zod), staged for review with per-row error reporting, then committed as balanced journal entries against a chosen account
+- **Account & transaction views** — per-account balance and transaction history
 
----
+## What's Next
 
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────────────────┐
-│                   LedgerLoop Engine                  │
-│                                                      │
-│  ┌──────────┐    ┌──────────┐    ┌───────────────┐  │
-│  │ Ingestion│───▶│ Matching │───▶│   Reporting   │  │
-│  │  Layer   │    │  Engine  │    │     Layer     │  │
-│  └──────────┘    └──────────┘    └───────────────┘  │
-│       │               │                  │           │
-│  CSV/JSON       Amount + Date      Match Rate +      │
-│  Parsing        + Reference        Discrepancies     │
-└─────────────────────────────────────────────────────┘
-```
-
-**Matching Logic:**
-A transaction is considered matched when:
-1. **Amount** matches within a configurable tolerance
-2. **Date** falls within an acceptable range window
-3. **Reference number** or description partially matches
-
-Unmatched entries on either side are flagged for human review.
+- **Reconciliation engine** — matching imported transactions against manually entered ones, flagging duplicates and mismatches (the core differentiator — not started yet)
+- **OAuth** (Google/Microsoft) as a polish-phase addition alongside password auth
+- **Deployment**
 
 ---
 
-## 🚧 Roadmap
+## Tech Stack
 
-> **Current Phase:** Core engine scaffolding
+| Layer | Technology |
+|---|---|
+| Frontend | Next.js 16 (App Router), React 19, Tailwind CSS v4, Radix UI / shadcn |
+| Backend | Express 5, TypeScript |
+| Database | PostgreSQL via Prisma 7 |
+| Sessions | Redis (`connect-redis` + `express-session`) |
+| Auth | bcrypt password hashing, session cookies |
+| Validation | Zod |
+| File handling | Multer (upload) + `csv-parser` |
+| Tooling | pnpm, Jest, conventional commits, gitflow |
+
+---
+
+## Architecture
+
+The backend is organized by **feature module**, not by technical layer:
+
+```
+server/src/modules/
+├── auth/        # signup, login, logout, session
+├── accounts/    # account CRUD, balances, transaction history
+├── ledger/      # journal entries (double-entry, balance-checked)
+└── import/      # CSV parsing, row validation, staged import, commit
+```
+
+Each module owns its controller, service, and schema. Routers are mounted in `server/src/api/v1/index.ts` under a prefix that matches the module name — e.g. the `accounts` module is mounted at `/api/v1/accounts`, not under `/ledger`. This mapping is the single source of truth for API paths; see [CONTRIBUTION.md](./CONTRIBUTION.md#api-endpoints) for the full endpoint list.
+
+**CSV Import Flow:**
+
+```
+Upload CSV ──▶ Parse rows ──▶ Validate (Zod) ──▶ Stage as ImportBatch
+                                                         │
+                                                         ▼
+                                          Review valid/invalid rows
+                                                         │
+                                                         ▼
+                                    Commit ──▶ Balanced journal entries
+```
+
+---
+
+## Roadmap
 
 | Phase | Feature | Status |
 |---|---|---|
-| 1 | Project architecture & scaffolding | ✅ Done |
-| 2 | CSV/JSON ingestion layer | 🔄 In Progress |
-| 3 | Core transaction matching algorithm | ⏳ Up Next |
-| 4 | Discrepancy flagging & exception reporting | ⏳ Planned |
-| 5 | REST API layer (Express) | ⏳ Planned |
-| 6 | Dashboard UI | ⏳ Planned |
-| 7 | Multi-currency support | 💡 Future |
-| 8 | Bank statement auto-import (Plaid/Mono) | 💡 Future |
+| 1 | Multi-user auth (sessions, hashing, scoped queries) | ✅ Done |
+| 2 | Accounts API + UI | 🔄 API done, UI in progress |
+| 3 | CSV import (parse, validate, stage, commit) | 🔄 Backend done, frontend upload/preview UI pending |
+| 4 | Reconciliation engine | ⏳ Planned — the core differentiating feature |
+| 5 | OAuth, polish, deployment | ⏳ Planned |
 
 ---
 
-## 🔧 Local Setup
+## Local Setup
 
-> Full setup guide will be added once the core engine reaches v0.1.0
+LedgerLoop is two independent apps — `client/` (Next.js) and `server/` (Express) — each with its own dependencies. For full setup instructions (Docker services, environment variables, migrations, seeding), see **[CONTRIBUTION.md](./CONTRIBUTION.md)**.
+
+Quick version:
 
 ```bash
-# Clone the repo
 git clone https://github.com/KingsCreatives/ledger-loop.git
 cd ledger-loop
 
-# Install dependencies
-npm install
+# Backend
+cd server && docker compose up -d && pnpm install
+pnpm exec prisma migrate deploy
+pnpm dev          # http://localhost:5000
 
-# Run in development mode
-npm run dev
+# Frontend (new terminal)
+cd ../client && pnpm install
+pnpm dev          # http://localhost:3000
 ```
 
 ---
 
-## 🎯 Who Is This For?
+## Who Is This For?
 
 | User | Benefit |
 |---|---|
-| **SME Finance Teams** | Eliminate monthly manual reconciliation work |
+| **SME finance teams** | Eliminate monthly manual reconciliation work |
 | **Accountants** | Catch discrepancies in seconds, not hours |
-| **Fintech Developers** | Embed reconciliation logic into any financial system |
-| **Auditors** | Get a clear, machine-generated audit trail |
+| **Fintech developers** | Reference implementation of double-entry bookkeeping + reconciliation |
+| **Auditors** | Clear, system-generated ledger trail |
 
 ---
 
-## 🌍 Why This Exists
+## Why This Exists
 
-Most reconciliation tools are either locked inside expensive ERP systems (SAP, Oracle) or require complex integrations. LedgerLoop is being built as a lightweight, open-source engine that any finance team or developer can run — inspired by the real-world pain of manual reconciliation in Ghanaian banking and finance environments.
-
----
-
-## 👤 Author
-
-<a href="https://github.com/KingsCreatives" target="_blank">
-  <strong>Samuel Kingsford Amoah</strong>
-</a>
-
-Software engineer with direct experience in financial reconciliation, having personally managed GHC 80M+ in daily vault audits at Ghana Commercial Bank and GHC 18M in grant portfolios at Environment360. LedgerLoop isn't a side project built from tutorials. It's built from domain expertise.
-
-- 🔗 <a href="https://linkedin.com/in/samuel-kamoah" target="_blank">LinkedIn</a>
-- 💻 <a href="https://github.com/KingsCreatives" target="_blank">GitHub</a>
-- 📧 skamoah882@gmail.com
-
----
+Most reconciliation tools are locked inside expensive ERP systems or require complex integrations. LedgerLoop is a portfolio project demonstrating both technical depth (correct double-entry accounting, transactional imports, session-based multi-tenant auth) and product completeness — inspired by the real-world pain of manual reconciliation in banking and finance environments.
 
 <div align="center">
 

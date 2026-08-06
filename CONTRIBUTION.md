@@ -1,27 +1,23 @@
 # Contributing to LedgerLoop
 
-Welcome to LedgerLoop! This guide will help you get the project up and running on your local machine. Whether you're a developer, contributor, or just curious, follow these steps to set up your development environment.
+Welcome to LedgerLoop! This guide gets the project running locally. LedgerLoop is **two independent apps** — `client/` and `server/` — each managed with their own `pnpm install`. There is no root-level install step.
 
 ---
 
 ## Prerequisites
 
-Before starting, ensure you have the following installed on your machine:
-
-- **Node.js** (v18 or higher) - [Download here](https://nodejs.org/)
-- **pnpm** (v11.10.0 or higher) - Install globally: `npm install -g pnpm`
-- **Docker & Docker Compose** - [Install here](https://docs.docker.com/get-docker/)
-- **Git** - [Download here](https://git-scm.com/)
-- **PostgreSQL Client** (optional, for direct database access) - [Download here](https://www.postgresql.org/download/)
+- **Node.js** (v20+) — [Download here](https://nodejs.org/)
+- **pnpm** (v11.10.0+) — `npm install -g pnpm`
+- **Docker & Docker Compose** — [Install here](https://docs.docker.com/get-docker/)
+- **Git**
 
 ### Verify Installations
 
 ```bash
-node --version      # Should be v18+
-pnpm --version      # Should be v11.10.0+
+node --version
+pnpm --version
 docker --version
 docker compose --version
-git --version
 ```
 
 ---
@@ -30,28 +26,33 @@ git --version
 
 ```
 ledger-loop/
-├── client/              # Next.js frontend (React 19)
+├── client/                        # Next.js frontend (React 19)
+│   └── src/
+│       ├── app/                   # App Router pages
+│       ├── components/            # React components (incl. components/ui — shadcn)
+│       ├── context/                # AuthContext
+│       └── lib/                    # axios instance, constants, utils
+│
+├── server/                        # Express backend
 │   ├── src/
-│   │   ├── app/        # App routing
-│   │   ├── components/ # React components
-│   │   ├── context/    # Context API for state
-│   │   └── lib/        # Utilities (axios, constants)
-│   └── package.json
-├── server/              # Express.js backend (Node.js)
-│   ├── src/
-│   │   ├── app.ts      # Express app configuration
-│   │   ├── server.ts   # Server entry point
-│   │   ├── controllers/# Route handlers
-│   │   ├── services/   # Business logic
-│   │   ├── routes/     # API routes
-│   │   ├── middleware/ # Custom middleware
-│   │   ├── schemas/    # Zod validation schemas
-│   │   └── utils/      # Helpers (Prisma, error handling)
-│   ├── prisma/         # Database schema & migrations
-│   ├── docker-compose.yml
-│   └── package.json
+│   │   ├── app.ts                 # Express app, session/redis/cors setup
+│   │   ├── server.ts              # Entry point
+│   │   ├── api/v1/index.ts        # Mounts every module router — the source of truth for URL prefixes
+│   │   ├── modules/
+│   │   │   ├── auth/              # signup, login, logout, session (controller/service/schema/routes)
+│   │   │   ├── accounts/          # account CRUD, balance, transaction history
+│   │   │   ├── ledger/            # journal entry creation (double-entry, balance-checked)
+│   │   │   └── import/            # CSV parse → validate → stage → commit
+│   │   └── shared/
+│   │       ├── middleware/        # requireAuth
+│   │       └── utils/             # prisma client, error classes, asyncHandler, multer config
+│   ├── prisma/                    # schema.prisma, migrations, seed.ts
+│   └── docker-compose.yml
+│
 └── README.md
 ```
+
+**Module pattern:** each module under `server/src/modules/` is self-contained — its own `*.controller.ts`, `*.service.ts`, `*.schema.ts` (Zod), and `*.routes.ts`. A module's routes only become live at the prefix it's mounted under in `api/v1/index.ts` — the routes file itself defines only the *sub-paths*. See [API Endpoints](#api-endpoints) below for the full resolved list, and don't assume a route lives under `/ledger` just because its logic is ledger-adjacent — check the mount.
 
 ---
 
@@ -66,305 +67,166 @@ cd ledger-loop
 
 ## Step 2: Set Up Docker Services
 
-The project uses **Docker Compose** to run PostgreSQL and Redis. These services are essential for the application to work.
-
-### Step 2.1: Grant Docker Permissions
-
-If you're on Linux/Mac and get a permission error, add your user to the docker group:
-
-```bash
-sudo usermod -aG docker $USER
-newgrp docker
-```
-
-Verify Docker is accessible:
-
-```bash
-docker ps
-```
-
-### Step 2.2: Start Docker Services
-
-Navigate to the server directory and start the services:
-
 ```bash
 cd server
 docker compose up -d
-```
-
-This will start:
-
-- **PostgreSQL** on port `5435` (pgweb UI on port `8085`)
-- **Redis** on port `6379` (redis-commander UI on port `8081`)
-
-Verify services are running:
-
-```bash
 docker compose ps
 ```
 
-You should see:
+This starts:
 
-```
-NAME                COMMAND                  SERVICE             STATUS
-postgres            "docker-entrypoint.s…"   postgres            Up
-redis               "redis-server --save…"   redis               Up
-pgweb               "pgweb"                  pgweb               Up
-redis-commander     "npm start"              redis-commander     Up
-```
+- **PostgreSQL** on port `5435` (pgweb UI on `8085`)
+- **Redis** on port `6379` (redis-commander UI on `8081`)
+
+The server will fail to accept requests correctly if Redis isn't reachable — `app.ts` connects to Redis at startup for the session store, so start Docker **before** `pnpm dev`.
 
 ---
 
 ## Step 3: Configure Environment Variables
 
-### Step 3.1: Create `.env` in the Server Directory
-
-Navigate to `server/` and create a `.env` file with the following variables:
-
-```bash
-cd /home/imking/projects/ledger-loop/server
-```
-
-Create `.env`:
+### `server/.env`
 
 ```env
-# PostgreSQL Connection
 DATABASE_URL=postgresql://postgres:password123@localhost:5435/ledger_loop
 
-# Server Configuration
 PORT=5000
 NODE_ENV=development
 
-# Session Secret (generate a strong one)
 SESSION_SECRET=your_secure_random_string_here_min_32_chars
 
-# Docker Compose Environment Variables
 DB_NAME=ledger_loop
 DB_USER=postgres
 DB_PASSWORD=password123
 
-# Redis UI Credentials (for redis-commander on port 8081)
 REDIS_UI_USER=admin
 REDIS_UI_PASSWORD=admin123
 ```
 
-**Generate a secure SESSION_SECRET:**
+Generate `SESSION_SECRET`:
 
 ```bash
 openssl rand -base64 32
 ```
 
-### Step 3.2: Create `.env.local` in the Client Directory
-
-Navigate to `client/` and create a `.env.local` file:
-
-```bash
-cd /home/imking/projects/ledger-loop/client
-```
-
-Create `.env.local`:
+### `client/.env.local`
 
 ```env
-# API Configuration
 NEXT_PUBLIC_API_URL=http://localhost:5000/api/v1
 ```
 
-This variable tells the frontend where to reach the backend API.
-
-### Step 3.3: Verify Database Connection
-
-Test the connection from the `server/` directory:
-
-```bash
-pnpm exec prisma db push
-```
+Every client-side `api.get(...)` / `api.post(...)` call is relative to this base — e.g. `api.get('/accounts')` resolves to `http://localhost:5000/api/v1/accounts`.
 
 ---
 
 ## Step 4: Install Dependencies
 
-### Step 4.1: Install Server Dependencies
-
 ```bash
-cd server
-pnpm install
-```
-
-### Step 4.2: Install Client Dependencies
-
-```bash
-cd ../client
-pnpm install
+cd server && pnpm install
+cd ../client && pnpm install
 ```
 
 ---
 
 ## Step 5: Set Up the Database
 
-### Step 5.1: Run Database Migrations
-
-From the `server` directory:
-
 ```bash
 cd server
 pnpm exec prisma migrate deploy
+pnpm exec prisma db seed        # optional — seeds a test user + sample accounts
 ```
 
-### Step 5.2: Seed the Database (Optional)
+Seeded login: email `finance_admin_9819@example.com`, password `password123` (check server logs for the exact generated email).
 
-Populate the database with initial test data:
-
-```bash
-pnpm exec prisma db seed
-```
-
-This creates:
-
-- A test user account with email `finance_admin_*@example.com` and password `password123`
-- Sample accounts (Operating Cash, Owner's Equity)
-- Initial journal entries
-
-### Step 5.3: View Database (Optional)
-
-Open **Prisma Studio** to browse and manage data:
-
-```bash
-pnpm exec prisma studio
-```
-
-This opens an admin UI at `http://localhost:5555`
+View data: `pnpm exec prisma studio` → `http://localhost:5555`
 
 ---
 
 ## Step 6: Start the Development Servers
 
-### Step 6.1: Start the Backend Server
-
-From the `server` directory:
-
 ```bash
-cd server
-pnpm dev
+# Terminal 1
+cd server && pnpm dev     # Server is listening PORT:5000
+
+# Terminal 2
+cd client && pnpm dev     # ▲ Next.js — Local: http://localhost:3000
 ```
-
-You should see:
-
-```
-Server is listening PORT:5000
-```
-
-The API is now available at `http://localhost:5000`
-
-### Step 6.2: Start the Frontend Server (in a new terminal)
-
-From the `client` directory:
-
-```bash
-cd client
-pnpm dev
-```
-
-You should see:
-
-```
-  ▲ Next.js 16.1.6
-  - Local:        http://localhost:3000
-```
-
-The frontend is now available at `http://localhost:3000`
 
 ---
 
 ## Verification Checklist
 
-After completing the setup, verify everything is working:
-
-- [ ] **Backend API**: Visit `http://localhost:5000` (should respond or show API info)
-- [ ] **Frontend**: Visit `http://localhost:3000` (should load the homepage)
-- [ ] **PostgreSQL**: Visit `http://localhost:8085` (pgweb admin UI)
-- [ ] **Redis Commander**: Visit `http://localhost:8081` (Redis UI)
-- [ ] **Prisma Studio**: Run `pnpm exec prisma studio` from `server/` directory
+- [ ] **Backend**: `http://localhost:5000/api/v1/auth/me` responds (401 if logged out is correct — that means it's up)
+- [ ] **Frontend**: `http://localhost:3000` loads
+- [ ] **pgweb**: `http://localhost:8085`
+- [ ] **Redis Commander**: `http://localhost:8081`
 
 ---
 
 ## API Endpoints
 
-The backend provides the following endpoints (prefix: `/api/v1`):
+All routes are mounted under `/api/v1` in `server/src/api/v1/index.ts`. **The prefix a router is mounted at, plus the sub-path defined inside that router file, is the entire URL — always check both.**
 
-### Authentication
+### Auth — mounted at `/auth` (`auth.routes.ts`)
 
-- `POST /auth/register` - Register a new user
-- `POST /auth/login` - Login user
-- `POST /auth/logout` - Logout user
+| Method | Path | Auth required |
+|---|---|---|
+| POST | `/auth/signup` | No |
+| POST | `/auth/login` | No |
+| POST | `/auth/logout` | No |
+| GET | `/auth/me` | Yes |
 
-### Accounts
+### Accounts — mounted at `/accounts` (`account.routes.ts`), all routes require auth
 
-- `GET /ledger/accounts` - List all accounts for the user
-- `POST /ledger/accounts` - Create a new account
-- `GET /ledger/accounts/:accountId` - Get account details
+| Method | Path |
+|---|---|
+| GET | `/accounts` |
+| POST | `/accounts` |
+| GET | `/accounts/:accountId` |
+| GET | `/accounts/:accountId/balance` |
+| GET | `/accounts/:accountId/transactions` |
 
-### Imports
+### Ledger — mounted at `/ledger` (`ledger.routes.ts`), requires auth
 
-- `POST /import/upload` - Upload CSV/JSON import file
-- `GET /import/batches` - List import batches
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/ledger` | Creates a balanced journal entry (2+ lines, debits = credits) |
 
-### Ledger
+### Import — mounted at `/import` (`import.routes.ts`)
 
-- `GET /ledger/entries` - List journal entries
-- `POST /ledger/entries` - Create journal entry
+| Method | Path | Notes |
+|---|---|---|
+| POST | `/import/parse` | Multipart, field name `file`; parses + validates CSV, stages an `ImportBatch` |
+| POST | `/import/commit` | Body: `{ batchId, offsetAccountId }`; commits staged rows as journal entries |
 
 ---
 
 ## Common Commands
 
-### Backend (from `server/` directory)
+### Backend (`server/`)
 
 ```bash
-# Development server with hot-reload
-pnpm dev
-
-# Run database migrations
-pnpm exec prisma migrate dev --name "migration_name"
-
-# Reset database (development only)
-pnpm exec prisma migrate reset
-
-# Open Prisma Studio
-pnpm exec prisma studio
-
-# Check migration status
+pnpm dev                                        # dev server with hot-reload (nodemon + tsx)
+pnpm test                                        # jest
+pnpm exec prisma migrate dev --name "name"        # new migration
+pnpm exec prisma migrate reset                    # reset db (dev only)
 pnpm exec prisma migrate status
+pnpm exec prisma studio
 ```
 
-### Frontend (from `client/` directory)
+### Frontend (`client/`)
 
 ```bash
-# Development server
 pnpm dev
-
-# Build for production
 pnpm build
-
-# Start production server
 pnpm start
-
-# Run linter
 pnpm lint
 ```
 
-### Docker (from `server/` directory)
+### Docker (`server/`)
 
 ```bash
-# Start services
 docker compose up -d
-
-# Stop services
 docker compose down
-
-# View service logs
-docker compose logs -f
-
-# View specific service logs
 docker compose logs -f postgres
 docker compose logs -f redis
 ```
@@ -373,54 +235,33 @@ docker compose logs -f redis
 
 ## Troubleshooting
 
-### Issue: Docker permission denied
+**Client requests 404 that "should" work** — almost always a stale path from before the module restructure (e.g. `/ledger/accounts` instead of `/accounts`). Check the route table above, not the folder the logic lives in.
 
-**Solution**: Add your user to the docker group and apply changes:
+**Docker permission denied** (Linux/Mac):
 
 ```bash
 sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-### Issue: Port already in use
-
-**Solution**: Change the port in `.env` (backend) or `next.config.ts` (frontend), or kill the process using the port:
+**Port already in use**:
 
 ```bash
-# Kill process on port 5000
-lsof -ti:5000 | xargs kill -9
-
-# Kill process on port 3000
-lsof -ti:3000 | xargs kill -9
+lsof -ti:5000 | xargs kill -9   # backend
+lsof -ti:3000 | xargs kill -9   # frontend
 ```
 
-### Issue: `DATABASE_URL` connection error
+**`DATABASE_URL` connection error** — confirm Docker is up (`docker compose ps`) and `.env` matches `docker-compose.yml`: host `localhost`, port `5435` (not `5432`), user `postgres`, password matches `DB_PASSWORD`.
 
-**Solution**: Verify Docker services are running:
+**Server hangs or session/auth calls fail silently** — check Redis is running; `app.ts` needs a live Redis connection for the session store at startup.
+
+**Prisma Client not generated**:
 
 ```bash
-docker compose ps
+cd server && pnpm exec prisma generate
 ```
 
-Ensure your `.env` has the correct credentials matching `docker-compose.yml`:
-
-- Host: `localhost` (not `postgres`)
-- Port: `5435` (not `5432`)
-- User: `postgres`
-- Password: matches `DB_PASSWORD` in `.env`
-
-### Issue: Prisma Client not generated
-
-**Solution**: Generate Prisma Client manually:
-
-```bash
-cd server
-pnpm exec prisma generate
-```
-
-### Issue: Dependencies not installing
-
-**Solution**: Clear pnpm cache and reinstall:
+**Dependencies won't install**:
 
 ```bash
 pnpm store prune
@@ -429,66 +270,31 @@ pnpm install
 
 ---
 
-## Database Configuration
-
-### PostgreSQL
-
-- **Host**: localhost
-- **Port**: 5435
-- **Database**: ledger_loop
-- **User**: postgres
-- **Password**: (set in `.env` as `DB_PASSWORD`)
-- **Admin UI**: http://localhost:8085 (pgweb)
-
-### Redis
-
-- **Host**: localhost
-- **Port**: 6379
-- **Purpose**: Session storage and caching
-- **Admin UI**: http://localhost:8081 (redis-commander)
-
----
-
 ## Tech Stack
 
-| Layer              | Technology             | Version | Purpose                           |
-| ------------------ | ---------------------- | ------- | --------------------------------- |
-| Frontend Framework | Next.js                | 16.1.6  | React framework with routing      |
-| Frontend Language  | TypeScript             | 5       | Type-safe frontend code           |
-| Frontend UI        | Radix UI + TailwindCSS | Latest  | Component library & styling       |
-| Backend Framework  | Express.js             | 5.2.1   | REST API server                   |
-| Backend Language   | TypeScript             | 5.9.3   | Type-safe backend code            |
-| ORM                | Prisma                 | 7.4.2   | Database abstraction & migrations |
-| Database           | PostgreSQL             | Alpine  | Primary data store                |
-| Cache/Sessions     | Redis                  | Alpine  | Session storage & caching         |
-| Validation         | Zod                    | 4.4.3   | Schema validation                 |
-| Dev Tools          | nodemon + tsx          | Latest  | Auto-reload development           |
+| Layer | Technology | Purpose |
+|---|---|---|
+| Frontend framework | Next.js 16 | App Router, routing |
+| Frontend language | TypeScript 5 | Type-safe frontend |
+| Frontend UI | Radix UI + Tailwind CSS v4 | Components & styling |
+| Backend framework | Express 5 | REST API |
+| Backend language | TypeScript 5.9 | Type-safe backend |
+| ORM | Prisma 7 | DB abstraction & migrations |
+| Database | PostgreSQL | Primary data store |
+| Sessions | Redis + connect-redis + express-session | Session storage |
+| Validation | Zod 4 | Request/row validation |
+| File upload | Multer + csv-parser | CSV import pipeline |
+| Testing | Jest + ts-jest | Unit tests |
+| Dev tools | nodemon + tsx | Auto-reload |
 
 ---
 
 ## Contributing Guidelines
 
-1. **Create a feature branch** from `develop`:
-
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-2. **Make your changes** and test thoroughly
-
-3. **Commit with clear messages**:
-
-   ```bash
-   git commit -m "feat: add new feature"
-   ```
-
-4. **Push to your branch**:
-
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-5. **Open a Pull Request** with a detailed description
+1. Branch from `develop`: `git checkout -b feature/your-feature-name`
+2. Make your changes and test thoroughly (`pnpm test` in `server/`)
+3. Commit using conventional commits: `git commit -m "feat(accounts): add account archiving"`
+4. Push and open a Pull Request with a clear description
 
 ---
 
@@ -496,16 +302,8 @@ pnpm install
 
 - **Issues**: [GitHub Issues](https://github.com/KingsCreatives/ledger-loop/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/KingsCreatives/ledger-loop/discussions)
-- **Documentation**: See [README.md](./README.md)
+- **Documentation**: [README.md](./README.md)
 
 ---
 
-## License
-
-This project is licensed under the MIT License. See [LICENSE](./LICENSE) for details.
-
----
-
-## Thank You!
-
-Thank you for contributing to LedgerLoop! Your efforts help make financial reconciliation simpler for everyone.
+Thank you for contributing to LedgerLoop!
