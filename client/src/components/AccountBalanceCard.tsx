@@ -18,7 +18,7 @@ const AccountBalanceCard = ({ accountId, refreshTrigger }: Props) => {
     const fetchBalance = async () => {
       try {
         setIsLoading(true);
-        const response = await api.get(`/ledger/balance/${accountId}`);
+        const response = await api.get(`/accounts/${accountId}/balance`);
         setBalance(response.data.balance);
       } catch (error) {
         console.error('Failed to fetch:', error);

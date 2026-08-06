@@ -1,13 +1,10 @@
 import 'dotenv/config';
-import { Pool } from 'pg';
-import { PrismaPg } from '@prisma/adapter-pg';
 import {
-  PrismaClient,
   AccountType,
   LineType,
 } from '../generated/prisma/client';
-import { prisma } from '../src/utils/prisma';
-import { AuthService } from '../src/services/auth.service';
+import { prisma } from '../src/shared/utils/prisma';
+import { AuthService } from '../src/modules/auth/auth.service';
 
 async function main() {
   console.log('🌱 Starting database seed...');

@@ -79,7 +79,7 @@ export const AddTransactionModal = ({ onSuccess }: Props) => {
           Add Transaction
         </Button>
       </DialogTrigger>
-      <DialogContent className='bg-[#0d1117] text-white border-white/10 sm:max-w-106.25 rounded-3xl'>
+      <DialogContent className='bg-background text-white border-white/10 sm:max-w-106.25 rounded-3xl'>
         <DialogHeader>
           <DialogTitle className='text-xl font-bold'>
             New Transaction

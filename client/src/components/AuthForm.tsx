@@ -45,7 +45,7 @@ const AuthForm = ({ mode }: AuthFormProps) => {
   };
 
   return (
-    <main className='min-h-screen bg-[#0d1117] text-white flex items-center justify-center p-6'>
+    <main className='min-h-screen bg-background text-white flex items-center justify-center p-6'>
       <div className='w-full max-w-md space-y-8'>
         <div className='text-center'>
           <Link href='/'>

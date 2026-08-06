@@ -40,7 +40,7 @@ export const CreateAccountModal = ({ onSuccess }: Props) => {
     setIsSaving(true);
 
     try {
-      await api.post('/ledger/accounts', payload);
+      await api.post('/accounts', payload);
       setOpen(false);
       setName('');
       setType('');
@@ -59,7 +59,7 @@ export const CreateAccountModal = ({ onSuccess }: Props) => {
           Create Account
         </Button>
       </DialogTrigger>
-      <DialogContent className='bg-[#0d1117] text-white border-white/10 sm:max-w-106.25 rounded-3xl'>
+      <DialogContent className='bg-background text-white border-white/10 sm:max-w-106.25 rounded-3xl'>
         <DialogHeader>
           <DialogTitle className='text-xl font-bold'>New Account</DialogTitle>
         </DialogHeader>

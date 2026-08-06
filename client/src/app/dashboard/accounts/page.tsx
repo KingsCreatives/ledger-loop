@@ -18,11 +18,11 @@ const Account = () => {
 
   const fetchAccounts = async () => {
     try {
-      const response = await api.get('/ledger/accounts');
+      const response = await api.get('/accounts');
       const accountsWithBalance = await Promise.all(
         response.data.map(async (account: AccountWithBalance) => {
           const balanceResponse = await api.get(
-            `/ledger/balance/${account.id}`,
+            `/accounts/${account.id}/balance`,
           );
           return { ...account, balance: balanceResponse.data.balance };
         }),

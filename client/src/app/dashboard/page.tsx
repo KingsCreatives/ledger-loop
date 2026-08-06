@@ -35,7 +35,7 @@ export default function Dashboard() {
   const fetchAccounts = async () => {
     try {
       setIsLoading(true);
-      const response = await api.get('/ledger/accounts');
+      const response = await api.get('/accounts');
       setAccounts(response.data);
 
       const firstAsset = response.data.find(

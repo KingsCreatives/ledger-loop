@@ -38,8 +38,8 @@ export default function AccountDetailsPage({
       setIsLoading(true);
       try {
         const [accountResponse, transactionResponse] = await Promise.all([
-          api.get(`/ledger/accounts/${params.accountId}`),
-          api.get(`/ledger/accounts/${params.accountId}/transactions`),
+          api.get(`/accounts/${params.accountId}`),
+          api.get(`/accounts/${params.accountId}/transactions`),
         ]);
         setAccount(accountResponse.data);
         setTransactions(transactionResponse.data);

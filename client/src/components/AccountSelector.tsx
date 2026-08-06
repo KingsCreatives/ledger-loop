@@ -32,7 +32,7 @@ export const AccountSelector = ({
   useEffect(() => {
     const fetchAccounts = async () => {
       try {
-        const response = await api.get('/ledger/accounts');
+        const response = await api.get('/accounts');
         setAccounts(response.data);
       } catch (error) {
         console.error('Failed to fetch accounts:', error);
