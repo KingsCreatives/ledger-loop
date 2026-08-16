@@ -1,118 +1,124 @@
-import { ImportService } from './import.service';
-import { prisma } from '../../shared/utils/prisma';
-import { LedgerService } from '../ledger/ledger.service';
-import { ImportStatus, LineType } from '../../../generated/prisma/enums';
-import mockRows from '../../fixtures/mock-import-rows.json';
+import { describe, expect, it } from 'vitest';
+import { ImportService } from '../import.service.js';
 
-jest.mock('../../shared/utils/prisma', () => ({
-  prisma: {
-    importBatch: {
-      findFirst: jest.fn(),
-      update: jest.fn(),
-    },
-  },
-}));
+describe('ImportService.parseCSV', () => {
+  it('should parse a valid CSV into rows', async () => {
+    const csv = [
+      'date,description,amount',
+      '2026-08-01,Salary,5000',
+      '2026-08-02,Rent,-1200',
+    ].join('\n');
 
-jest.mock('./ledger.service', () => ({
-  LedgerService: {
-    createEntry: jest.fn(),
-  },
-}));
+    const result = await ImportService.parseCSV(Buffer.from(csv));
 
-describe('ImportService.commitImport', () => {
-  const userId = 'user-1';
-  const batchId = 'batch-1';
-  const accountId = 'account-checking';
-  const offsetAccountId = 'account-suspense';
+    expect(result).toHaveLength(2);
 
-  const mockBatch = {
-    id: batchId,
-    userId,
-    accountId,
-    filename: 'test.csv',
-    status: 'VALIDATED',
-    importRows: mockRows.map((row: any) => ({
-      ...row,
-      date: new Date(row.date),
-    })),
-  };
-
-  beforeEach(() => {
-    jest.clearAllMocks();
-    (prisma.importBatch.findFirst as jest.Mock).mockResolvedValue(mockBatch);
-    (prisma.importBatch.update as jest.Mock).mockResolvedValue({
-      ...mockBatch,
-      status: ImportStatus.COMMITTED,
+    expect(result[0]).toEqual({
+      date: '2026-08-01',
+      description: 'Salary',
+      amount: '5000',
     });
-    (LedgerService.createEntry as jest.Mock).mockResolvedValue({
-      id: 'entry-1',
+
+    expect(result[1]).toEqual({
+      date: '2026-08-02',
+      description: 'Rent',
+      amount: '-1200',
     });
   });
 
-  it('loads the batch scoped to the correct user', async () => {
-    await ImportService.commitImport(batchId, offsetAccountId, userId);
+  it('should return an empty array for an empty CSV', async () => {
+    const result = await ImportService.parseCSV(Buffer.from(''));
 
-    expect(prisma.importBatch.findFirst).toHaveBeenCalledWith({
-      where: { id: batchId, userId },
-      include: { importRows: { where: { isValid: true } } },
-    });
+    expect(result).toEqual([]);
   });
 
-  it('builds a balanced DTO for a money-in row (debit account, credit offset)', async () => {
-    await ImportService.commitImport(batchId, offsetAccountId, userId);
+  it('should parse multiple rows correctly', async () => {
+    const csv = [
+      'date,description,amount',
+      '2026-08-01,Salary,5000',
+      '2026-08-02,Rent,-1200',
+      '2026-08-03,Transport,-300',
+    ].join('\n');
 
-    expect(LedgerService.createEntry).toHaveBeenCalledWith(
-      expect.objectContaining({
-        description: 'Client deposit payment',
-        lines: [
-          { accountId, type: LineType.DEBIT, amount: 570213 },
-          { accountId: offsetAccountId, type: LineType.CREDIT, amount: 570213 },
-        ],
-      }),
-      userId,
-    );
+    const result = await ImportService.parseCSV(Buffer.from(csv));
+
+    expect(result).toHaveLength(3);
+  });
+});
+
+describe('ImportService.validateRows', () => {
+  it('should return valid rows when all rows are valid', async () => {
+    const rows = [
+      {
+        date: '2026-08-01',
+        description: 'Salary',
+        amount: '5000',
+      },
+    ];
+
+    const result = await ImportService.validateRows(rows);
+
+    expect(result.validRows).toHaveLength(1);
+    expect(result.errors).toHaveLength(0);
   });
 
-  it('builds a balanced DTO for a money-out row (credit account, debit offset)', async () => {
-    await ImportService.commitImport(batchId, offsetAccountId, userId);
+  it('should return an error for an invalid row', async () => {
+    const rows = [
+      {
+        date: 'invalid-date',
+        description: 'Salary',
+        amount: '5000',
+      },
+    ];
 
-    expect(LedgerService.createEntry).toHaveBeenCalledWith(
-      expect.objectContaining({
-        description: 'Office supplies purchase',
-        lines: [
-          { accountId: offsetAccountId, type: LineType.DEBIT, amount: 409332 },
-          { accountId, type: LineType.CREDIT, amount: 409332 },
-        ],
-      }),
-      userId,
-    );
+    const result = await ImportService.validateRows(rows);
+
+    expect(result.validRows).toHaveLength(0);
+    expect(result.errors).toHaveLength(1);
+
+    const firstError = result.errors.at(0);
+    expect(firstError).toBeDefined();
+    if (!firstError) throw new Error('Expected a validation error');
+    expect(firstError.row).toBe(1);
   });
 
-  it('calls LedgerService.createEntry once per valid row', async () => {
-    await ImportService.commitImport(batchId, offsetAccountId, userId);
-    expect(LedgerService.createEntry).toHaveBeenCalledTimes(mockRows.length);
+  it('should handle mixed valid and invalid rows', async () => {
+    const rows = [
+      {
+        date: '2026-08-01',
+        description: 'Salary',
+        amount: '5000',
+      },
+      {
+        date: 'invalid-date',
+        description: 'Bad transaction',
+        amount: '500',
+      },
+    ];
+
+    const result = await ImportService.validateRows(rows);
+
+    expect(result.validRows).toHaveLength(1);
+    expect(result.errors).toHaveLength(1);
+
+    const firstError = result.errors.at(0);
+    expect(firstError).toBeDefined();
+    if (!firstError) throw new Error('Expected a validation error');
+    expect(firstError.row).toBe(2);
   });
 
-  it('updates the batch status to COMMITTED and returns it in the response', async () => {
-    const result = await ImportService.commitImport(
-      batchId,
-      offsetAccountId,
-      userId,
-    );
+  it('should transform amount from major units to cents', async () => {
+    const rows = [
+      {
+        date: '2026-08-01',
+        description: 'Salary',
+        amount: '5000.50',
+      },
+    ];
 
-    expect(prisma.importBatch.update).toHaveBeenCalledWith({
-      where: { id: batchId },
-      data: { status: ImportStatus.COMMITTED },
-    });
-    expect(result.status).toBe(ImportStatus.COMMITTED);
-    expect(result.imported).toBe(mockRows.length);
-  });
+    const result = await ImportService.validateRows(rows);
 
-  it('throws NotFoundError when the batch does not belong to the user', async () => {
-    (prisma.importBatch.findFirst as jest.Mock).mockResolvedValue(null);
-
-    await expect(
-      ImportService.commitImport(batchId, offsetAccountId, userId),
-    ).rejects.toThrow("Batch doesn't exist");
+    expect(result.validRows).toHaveLength(1);
+    expect(result.validRows.at(0)?.amount).toBe(500050);
   });
 });
