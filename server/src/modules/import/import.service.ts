@@ -100,7 +100,7 @@ export class ImportService {
   }) {
     const { userId, accountId, filename, validRows, errors } = params;
 
-    return prisma.$transaction(async (tx) => {
+    return prisma.$transaction(async (tx: { importBatch: { create: (arg0: { data: { userId: string; accountId: string; filename: string; status: any; }; }) => any; }; importRow: { createMany: (arg0: { data: { batchId: any; rowNumber: any; date: any; description: any; amount: any; isValid: boolean; }[]; }) => any; }; }) => {
       const batch = await tx.importBatch.create({
         data: {
           userId,
@@ -147,6 +147,7 @@ export class ImportService {
       where: {
         id: batchId,
         userId,
+        status: ImportStatus.VALIDATED,
       },
       include: {
         importRows: {
@@ -213,7 +214,11 @@ export class ImportService {
   ) {
     const batch = await this.loadImportBatch(batchId, userId);
 
-    return prisma.$transaction(async (tx) => {
+    if (batch.importRows.length === 0) {
+      throw new ValidationError('Import contains no valid rows');
+    }
+
+    return prisma.$transaction(async (tx: { importBatch: { update: (arg0: { where: { id: any; }; data: { status: any; }; }) => any; }; }) => {
       for (const row of batch.importRows) {
         const dto = this.buildJournalEntryDTO(
           row,
@@ -221,7 +226,7 @@ export class ImportService {
           offsetAccountId,
         );
 
-        await LedgerService.createEntry(dto, userId, tx);
+        await LedgerService.createEntry(dto, userId);
       }
 
       await tx.importBatch.update({
@@ -232,6 +237,7 @@ export class ImportService {
           status: ImportStatus.COMMITTED,
         },
       });
+
       return {
         batchId: batch.id,
         imported: batch.importRows.length,
