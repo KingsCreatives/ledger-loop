@@ -96,50 +96,92 @@ export class ImportService {
     accountId: string;
     filename: string;
     validRows: ValidatedImportRow[];
-    errors: { row: number; message: string; raw: ParsedCsvRow }[];
+    errors: {
+      row: number;
+      message: string;
+      raw: ParsedCsvRow;
+    }[];
   }) {
     const { userId, accountId, filename, validRows, errors } = params;
 
-    return prisma.$transaction(async (tx: { importBatch: { create: (arg0: { data: { userId: string; accountId: string; filename: string; status: any; }; }) => any; }; importRow: { createMany: (arg0: { data: { batchId: any; rowNumber: any; date: any; description: any; amount: any; isValid: boolean; }[]; }) => any; }; }) => {
-      const batch = await tx.importBatch.create({
-        data: {
-          userId,
-          accountId,
-          filename,
-          status: ImportStatus.VALIDATED,
-        },
-      });
-
-      const validRowData = validRows.map((row) => ({
-        batchId: batch.id,
-        rowNumber: row.rowNumber,
-        date: row.date,
-        description: row.description,
-        amount: row.amount,
-        isValid: true,
-      }));
-
-      const invalidRowData = errors.map((err) => ({
-        batchId: batch.id,
-        rowNumber: err.row,
-        date: isNaN(new Date(err.raw.date).getTime())
-          ? null
-          : new Date(err.raw.date),
-        description: err.raw.description?.trim() || null,
-        amount:
-          err.raw.amount && !isNaN(Number(err.raw.amount))
-            ? Math.round(Number(err.raw.amount) * 100)
-            : null,
-        isValid: false,
-        errorMessage: err.message,
-      }));
-
-      await tx.importRow.createMany({
-        data: [...validRowData, ...invalidRowData],
-      });
-
-      return batch;
+    const account = await prisma.account.findUnique({
+      where: {
+        id: accountId,
+        userId,
+      },
     });
+
+    if (!account) {
+      throw new ValidationError(
+        'Account does not exist or does not belong to the user',
+      );
+    }
+
+    return prisma.$transaction(
+      async (tx: {
+        importBatch: {
+          create: (arg0: {
+            data: {
+              userId: string;
+              accountId: string;
+              filename: string;
+              status: any;
+            };
+          }) => any;
+        };
+        importRow: {
+          createMany: (arg0: {
+            data: {
+              batchId: any;
+              rowNumber: any;
+              date: any;
+              description: any;
+              amount: any;
+              isValid: boolean;
+            }[];
+          }) => any;
+        };
+      }) => {
+        const batch = await tx.importBatch.create({
+          data: {
+            userId,
+            accountId,
+            filename,
+            status: ImportStatus.VALIDATED,
+          },
+        });
+
+        const validRowData = validRows.map((row) => ({
+          batchId: batch.id,
+          rowNumber: row.rowNumber,
+          date: row.date,
+          description: row.description,
+          amount: row.amount,
+          isValid: true,
+        }));
+
+        const invalidRowData = errors.map((err) => ({
+          batchId: batch.id,
+          rowNumber: err.row,
+          date: isNaN(new Date(err.raw.date).getTime())
+            ? null
+            : new Date(err.raw.date),
+          description: err.raw.description?.trim() || null,
+          amount:
+            err.raw.amount && !isNaN(Number(err.raw.amount))
+              ? Math.round(Number(err.raw.amount) * 100)
+              : null,
+          isValid: false,
+          errorMessage: err.message,
+        }));
+
+        await tx.importRow.createMany({
+          data: [...validRowData, ...invalidRowData],
+        });
+
+        return batch;
+      },
+    );
   }
 
   static async loadImportBatch(batchId: string, userId: string) {
@@ -218,31 +260,37 @@ export class ImportService {
       throw new ValidationError('Import contains no valid rows');
     }
 
-    return prisma.$transaction(async (tx: { importBatch: { update: (arg0: { where: { id: any; }; data: { status: any; }; }) => any; }; }) => {
-      for (const row of batch.importRows) {
-        const dto = this.buildJournalEntryDTO(
-          row,
-          batch.accountId,
-          offsetAccountId,
-        );
+    return prisma.$transaction(
+      async (tx: {
+        importBatch: {
+          update: (arg0: { where: { id: any }; data: { status: any } }) => any;
+        };
+      }) => {
+        for (const row of batch.importRows) {
+          const dto = this.buildJournalEntryDTO(
+            row,
+            batch.accountId,
+            offsetAccountId,
+          );
 
-        await LedgerService.createEntry(dto, userId);
-      }
+          await LedgerService.createEntry(dto, userId);
+        }
 
-      await tx.importBatch.update({
-        where: {
-          id: batch.id,
-        },
-        data: {
+        await tx.importBatch.update({
+          where: {
+            id: batch.id,
+          },
+          data: {
+            status: ImportStatus.COMMITTED,
+          },
+        });
+
+        return {
+          batchId: batch.id,
+          imported: batch.importRows.length,
           status: ImportStatus.COMMITTED,
-        },
-      });
-
-      return {
-        batchId: batch.id,
-        imported: batch.importRows.length,
-        status: ImportStatus.COMMITTED,
-      };
-    });
+        };
+      },
+    );
   }
 }
