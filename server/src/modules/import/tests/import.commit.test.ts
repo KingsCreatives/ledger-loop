@@ -495,4 +495,12 @@ describe('ImportService.commitImport', () => {
 
     expect(updatedBatch?.status).toBe(ImportStatus.VALIDATED);
   });
+
+  it('should reject committing a non-existent batch', async () => {
+    const fakeBatchId = '00000000-0000-0000-0000-000000000000';
+
+    await expect(
+      ImportService.commitImport(fakeBatchId, offsetAccountId, userId),
+    ).rejects.toThrow();
+  });
 });
