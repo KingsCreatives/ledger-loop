@@ -245,4 +245,214 @@ describe('AccountService.createAccount', () => {
       'Account ID is required.',
     );
   });
+
+  it('should return account information with the calculated balance', async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: `account-info-${crypto.randomUUID()}@example.com`,
+        password: 'password123',
+      },
+    });
+
+    const account = await AccountService.createAccount(
+      'Cash Account',
+      AccountType.ASSETS,
+      user.id,
+    );
+
+    const journalEntry = await prisma.journalEntry.create({
+      data: {
+        date: new Date(),
+        description: 'Account info test',
+      },
+    });
+
+    await prisma.transactionLine.createMany({
+      data: [
+        {
+          amount: 1500,
+          type: LineType.DEBIT,
+          accountId: account.id,
+          journalEntryId: journalEntry.id,
+        },
+        {
+          amount: 400,
+          type: LineType.CREDIT,
+          accountId: account.id,
+          journalEntryId: journalEntry.id,
+        },
+      ],
+    });
+
+    const result = await AccountService.getAccountInfo(account.id, user.id);
+
+    expect(result).toEqual({
+      id: account.id,
+      name: 'Cash Account',
+      type: AccountType.ASSETS,
+      balance: 1100,
+    });
+  });
+
+  it('should reject account info lookup when the account belongs to another user', async () => {
+    const owner = await prisma.user.create({
+      data: {
+        email: `info-owner-${crypto.randomUUID()}@example.com`,
+        password: 'password123',
+      },
+    });
+
+    const otherUser = await prisma.user.create({
+      data: {
+        email: `info-other-${crypto.randomUUID()}@example.com`,
+        password: 'password123',
+      },
+    });
+
+    const account = await AccountService.createAccount(
+      'Private Account',
+      AccountType.ASSETS,
+      owner.id,
+    );
+
+    await expect(
+      AccountService.getAccountInfo(account.id, otherUser.id),
+    ).rejects.toThrow('No account found, check id again');
+  });
+
+  it('should reject account info lookup for a non-existent account', async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: `missing-info-${crypto.randomUUID()}@example.com`,
+        password: 'password123',
+      },
+    });
+
+    const nonExistentAccountId = crypto.randomUUID();
+
+    await expect(
+      AccountService.getAccountInfo(nonExistentAccountId, user.id),
+    ).rejects.toThrow('No account found, check id again');
+  });
+
+  it('should reject account info lookup when no account ID is provided', async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: `missing-info-id-${crypto.randomUUID()}@example.com`,
+        password: 'password123',
+      },
+    });
+
+    await expect(AccountService.getAccountInfo('', user.id)).rejects.toThrow(
+      'No account Id provided',
+    );
+  });
+
+  it('should return transactions for an account', async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: `transactions-${crypto.randomUUID()}@example.com`,
+        password: 'password123',
+      },
+    });
+
+    const account = await AccountService.createAccount(
+      'Cash Account',
+      AccountType.ASSETS,
+      user.id,
+    );
+
+    const olderEntry = await prisma.journalEntry.create({
+      data: {
+        date: new Date('2026-01-01'),
+        description: 'Older transaction',
+      },
+    });
+
+    const newerEntry = await prisma.journalEntry.create({
+      data: {
+        date: new Date('2026-02-01'),
+        description: 'Newer transaction',
+      },
+    });
+
+    await prisma.transactionLine.createMany({
+      data: [
+        {
+          amount: 500,
+          type: LineType.DEBIT,
+          accountId: account.id,
+          journalEntryId: olderEntry.id,
+        },
+        {
+          amount: 1000,
+          type: LineType.DEBIT,
+          accountId: account.id,
+          journalEntryId: newerEntry.id,
+        },
+      ],
+    });
+
+    const transactions = await AccountService.getAccountTransactions(
+      account.id,
+      user.id,
+    );
+
+    expect(transactions).toHaveLength(2);
+
+    expect(transactions[0].journalEntryLine.id).toBe(newerEntry.id);
+    expect(transactions[0].journalEntryLine.date).toEqual(newerEntry.date);
+    expect(transactions[0].journalEntryLine.description).toBe(
+      'Newer transaction',
+    );
+    expect(transactions[0].amount).toBe(1000);
+
+    expect(transactions[1].journalEntryLine.id).toBe(olderEntry.id);
+    expect(transactions[1].journalEntryLine.date).toEqual(olderEntry.date);
+    expect(transactions[1].journalEntryLine.description).toBe(
+      'Older transaction',
+    );
+    expect(transactions[1].amount).toBe(500);
+  });
+
+  it('should reject transaction lookup when the account belongs to another user', async () => {
+    const owner = await prisma.user.create({
+      data: {
+        email: `transactions-owner-${crypto.randomUUID()}@example.com`,
+        password: 'password123',
+      },
+    });
+
+    const otherUser = await prisma.user.create({
+      data: {
+        email: `transactions-other-${crypto.randomUUID()}@example.com`,
+        password: 'password123',
+      },
+    });
+
+    const account = await AccountService.createAccount(
+      'Private Cash',
+      AccountType.ASSETS,
+      owner.id,
+    );
+
+    await expect(
+      AccountService.getAccountTransactions(account.id, otherUser.id),
+    ).rejects.toThrow('No account found, check id again');
+  });
+
+  it('should reject transaction lookup for a non-existent account', async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: `missing-transactions-${crypto.randomUUID()}@example.com`,
+        password: 'password123',
+      },
+    });
+
+    const nonExistentAccountId = crypto.randomUUID();
+
+    await expect(
+      AccountService.getAccountTransactions(nonExistentAccountId, user.id),
+    ).rejects.toThrow('No account found, check id again');
+  });
 });
