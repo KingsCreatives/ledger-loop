@@ -3,6 +3,9 @@ import { prisma } from '../../shared/utils/prisma';
 import { NotFoundError, ValidationError } from '../../shared/utils/errors';
 
 export class AccountService {
+  static getAccounts(id: any) {
+      throw new Error('Method not implemented.');
+  }
   private static calculateBalance(
     type: AccountType,
     debitSum: number,
