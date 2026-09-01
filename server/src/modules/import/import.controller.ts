@@ -33,6 +33,7 @@ export class ImportController {
         status: batch.status,
         validCount: validRows.length,
         errorCount: errors.length,
+        validRows,
         errors,
       });
     },
