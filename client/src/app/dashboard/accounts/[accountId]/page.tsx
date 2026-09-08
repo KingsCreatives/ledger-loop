@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { use, useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { formatCurrency } from '@/app/utils';
 import api from '@/lib/axios';
 
@@ -27,8 +27,10 @@ interface AccountInfo {
 export default function AccountDetailsPage({
   params,
 }: {
-  params: { accountId: string };
+  params: Promise<{ accountId: string }>;
 }) {
+  const { accountId } = use(params);
+
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState<AccountHistoryProp[]>([]);
   const [account, setAccount] = useState<AccountInfo | null>(null);
@@ -38,8 +40,8 @@ export default function AccountDetailsPage({
       setIsLoading(true);
       try {
         const [accountResponse, transactionResponse] = await Promise.all([
-          api.get(`/accounts/${params.accountId}`),
-          api.get(`/accounts/${params.accountId}/transactions`),
+          api.get(`/accounts/${accountId}`),
+          api.get(`/accounts/${accountId}/transactions`),
         ]);
         setAccount(accountResponse.data);
         setTransactions(transactionResponse.data);
@@ -51,7 +53,7 @@ export default function AccountDetailsPage({
     };
 
     fetchTransactions();
-  }, [params.accountId]);
+  }, [accountId]);
 
   if (isLoading) {
     return (
@@ -69,6 +71,14 @@ export default function AccountDetailsPage({
       >
         <ArrowLeft className='h-4 w-4' />
         Back to Accounts
+      </Link>
+
+      <Link
+        href={`/dashboard/import?accountId=${accountId}`}
+        className='inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-bold transition hover:bg-white/10 mb-8'
+      >
+        <ArrowRight className='h-4 w-4' />
+        Import Statement
       </Link>
 
       <div className='mb-8'>
