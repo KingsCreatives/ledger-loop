@@ -2,7 +2,17 @@
 
 import React, { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import {
+  Upload,
+  FileText,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+} from 'lucide-react';
 import api from '@/lib/axios';
+import { formatCurrency } from '@/app/utils';
+import { Button } from '@/components/ui/button';
+import { AccountSelector } from '@/components/AccountSelector';
 
 interface AccountInfo {
   id: string;
@@ -18,7 +28,7 @@ interface ValidRow {
 }
 
 interface ImportError {
-  rowNumber?: number;
+  row?: number;
   message: string;
 }
 
@@ -46,19 +56,29 @@ function ImportPageContent() {
   const [errors, setErrors] = useState<ImportError[]>([]);
   const [batchId, setBatchId] = useState<string | null>(null);
 
- const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-   const selectedFile = event.target.files?.[0] ?? null;
+  const [offsetAccountId, setOffsetAccountId] = useState<string | null>(null);
+  const [isCommitting, setIsCommitting] = useState(false);
+  const [commitError, setCommitError] = useState<string | null>(null);
 
-   if (selectedFile && !selectedFile.name.toLowerCase().endsWith('.csv')) {
-     setFile(null);
-     return;
-   }
+  const resetParseState = () => {
+    setValidRows([]);
+    setErrors([]);
+    setBatchId(null);
+    setOffsetAccountId(null);
+    setCommitError(null);
+  };
 
-   setFile(selectedFile);
-   setValidRows([]);
-   setErrors([]);
-   setBatchId(null);
- };
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0] ?? null;
+
+    if (selectedFile && !selectedFile.name.toLowerCase().endsWith('.csv')) {
+      setFile(null);
+      return;
+    }
+
+    setFile(selectedFile);
+    resetParseState();
+  };
 
   useEffect(() => {
     if (!accountId) {
@@ -86,11 +106,11 @@ function ImportPageContent() {
     if (!file || !accountId) return;
 
     const formData = new FormData();
-
     formData.append('file', file);
     formData.append('accountId', accountId);
 
     setIsParsing(true);
+    resetParseState();
 
     try {
       const response = await api.post<ParseResponse>('/import/parse', formData);
@@ -105,6 +125,36 @@ function ImportPageContent() {
     }
   };
 
+  const handleCommit = async () => {
+    if (!batchId || !offsetAccountId) return;
+
+    if (offsetAccountId === accountId) {
+      setCommitError(
+        'The offset account must be different from the account you are importing into.',
+      );
+      return;
+    }
+
+    setCommitError(null);
+    setIsCommitting(true);
+
+    try {
+      await api.post('/import/commit', {
+        batchId,
+        offsetAccountId,
+      });
+
+      router.push(`/dashboard/accounts/${accountId}`);
+    } catch (error) {
+      console.error('Failed to commit import:', error);
+      setCommitError(
+        'Something went wrong committing this import. Please try again.',
+      );
+    } finally {
+      setIsCommitting(false);
+    }
+  };
+
   if (isLoading || !account) {
     return (
       <div className='flex justify-center py-12'>
@@ -113,142 +163,216 @@ function ImportPageContent() {
     );
   }
 
+  const hasResults = validRows.length > 0 || errors.length > 0;
+
   return (
-    <div className='max-w-5xl mx-auto'>
-      <div className='mb-8'>
-        <h1 className='text-4xl font-bold tracking-tight'>Import Statement</h1>
+    <div className='max-w-5xl mx-auto space-y-6'>
+      <header>
+        <h1 className='text-4xl font-extrabold tracking-tight'>
+          Import Statement
+        </h1>
         <p className='mt-2 text-gray-400'>
-          Importing into:{' '}
-          <span className='text-white font-semibold'>{account.name}</span>
+          Importing into{' '}
+          <span className='text-primary font-semibold'>{account.name}</span>
         </p>
-        {/* <input type='file' accept='.csv,text/csv' onChange={handleFileChange} /> */}
-        <div className='mt-6 rounded-xl border border-gray-800 bg-gray-900/60 p-6'>
-          <div className='mb-4'>
-            <h2 className='text-lg font-semibold'>Upload Statement</h2>
-            <p className='mt-1 text-sm text-gray-400'>
-              Upload a CSV bank statement to preview your transactions.
+      </header>
+
+      <div className='rounded-3xl border border-white/10 bg-white/5 p-8'>
+        <div className='mb-6'>
+          <h2 className='text-lg font-bold'>Upload Statement</h2>
+          <p className='mt-1 text-sm text-gray-400'>
+            Upload a CSV bank statement to preview your transactions before
+            anything is committed.
+          </p>
+        </div>
+
+        <label
+          htmlFor='statement-file'
+          className='flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-white/20 bg-white/5 px-6 py-12 transition-all hover:border-primary/50 hover:bg-white/10'
+        >
+          <div className='mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary'>
+            {file ? (
+              <FileText className='h-6 w-6' />
+            ) : (
+              <Upload className='h-6 w-6' />
+            )}
+          </div>
+
+          {file ? (
+            <>
+              <p className='font-semibold text-white'>{file.name}</p>
+              <p className='mt-1 text-sm text-gray-400'>
+                {(file.size / 1024).toFixed(1)} KB — click to choose a different
+                file
+              </p>
+            </>
+          ) : (
+            <>
+              <p className='font-semibold text-white'>Choose a CSV file</p>
+              <p className='mt-1 text-sm text-gray-400'>
+                Click here to browse your files
+              </p>
+            </>
+          )}
+
+          <input
+            id='statement-file'
+            type='file'
+            accept='.csv,text/csv'
+            onChange={handleFileChange}
+            className='hidden'
+          />
+        </label>
+
+        <div className='mt-6 flex justify-end'>
+          <Button
+            onClick={handleParse}
+            disabled={!file || isParsing}
+            className='h-12 rounded-xl px-6 font-bold text-black'
+          >
+            {isParsing ? (
+              <>
+                <Loader2 className='h-4 w-4 animate-spin' />
+                Parsing...
+              </>
+            ) : (
+              'Upload & Preview'
+            )}
+          </Button>
+        </div>
+      </div>
+
+      {hasResults && (
+        <div className='flex flex-wrap gap-3'>
+          <div className='flex items-center gap-2 rounded-full bg-primary/10 px-4 py-2 text-sm font-semibold text-primary'>
+            <CheckCircle2 className='h-4 w-4' />
+            {validRows.length} valid
+          </div>
+          {errors.length > 0 && (
+            <div className='flex items-center gap-2 rounded-full bg-destructive/10 px-4 py-2 text-sm font-semibold text-destructive'>
+              <AlertCircle className='h-4 w-4' />
+              {errors.length} skipped
+            </div>
+          )}
+        </div>
+      )}
+
+      {validRows.length > 0 && (
+        <div className='overflow-hidden rounded-3xl border border-white/10 bg-white/5'>
+          <div className='border-b border-white/10 px-6 py-4'>
+            <h2 className='font-bold'>Valid Transactions</h2>
+            <p className='text-sm text-gray-400'>
+              These rows are ready to be committed once you choose an offset
+              account below.
             </p>
           </div>
 
-          <label
-            htmlFor='statement-file'
-            className='flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-gray-700 px-6 py-10 transition hover:border-gray-500 hover:bg-gray-800/40'
-          >
-            <div className='mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-gray-800'>
-              <span className='text-xl'>↑</span>
-            </div>
+          <div className='overflow-x-auto'>
+            <table className='w-full text-left text-sm'>
+              <thead className='bg-white/5'>
+                <tr>
+                  <th className='px-6 py-3 font-medium text-gray-400 uppercase tracking-widest text-xs'>
+                    Date
+                  </th>
+                  <th className='px-6 py-3 font-medium text-gray-400 uppercase tracking-widest text-xs'>
+                    Description
+                  </th>
+                  <th className='px-6 py-3 text-right font-medium text-gray-400 uppercase tracking-widest text-xs'>
+                    Amount
+                  </th>
+                </tr>
+              </thead>
 
-            {file ? (
-              <>
-                <p className='font-medium text-white'>{file.name}</p>
-                <p className='mt-1 text-sm text-gray-400'>
-                  {(file.size / 1024).toFixed(1)} KB
-                </p>
-              </>
-            ) : (
-              <>
-                <p className='font-medium text-white'>Choose a CSV file</p>
-                <p className='mt-1 text-sm text-gray-400'>
-                  Click here to browse your files
-                </p>
-              </>
-            )}
-
-            <input
-              id='statement-file'
-              type='file'
-              accept='.csv,text/csv'
-              onChange={handleFileChange}
-              className='hidden'
-            />
-          </label>
-
-          <div className='mt-4 flex justify-end'>
-            <button
-              type='button'
-              onClick={handleParse}
-              disabled={!file || isParsing}
-              className='rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-black transition hover:bg-gray-200 disabled:cursor-not-allowed disabled:opacity-40'
-            >
-              {isParsing ? 'Parsing...' : 'Upload & Preview'}
-            </button>
+              <tbody>
+                {validRows.map((row, index) => (
+                  <tr
+                    key={index}
+                    className='border-t border-white/10 transition-colors hover:bg-white/5'
+                  >
+                    <td className='px-6 py-4 text-gray-300'>
+                      {new Date(row.date).toLocaleDateString()}
+                    </td>
+                    <td className='px-6 py-4 text-white'>{row.description}</td>
+                    <td
+                      className={`px-6 py-4 text-right font-semibold ${
+                        row.amount < 0 ? 'text-destructive' : 'text-primary'
+                      }`}
+                    >
+                      {formatCurrency(row.amount)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
-        {validRows.length > 0 && (
-          <div className='mt-8 overflow-hidden rounded-xl border border-gray-800 bg-gray-900/40'>
-            <div className='border-b border-gray-800 px-6 py-4'>
-              <h2 className='font-semibold'>Valid Transactions</h2>
-              <p className='text-sm text-gray-400'>
-                {validRows.length} transactions ready for review
-              </p>
-            </div>
+      )}
 
-            <div className='overflow-x-auto'>
-              <table className='w-full text-left text-sm'>
-                <thead className='bg-gray-900'>
-                  <tr>
-                    <th className='px-6 py-3 font-medium text-gray-400'>
-                      Date
-                    </th>
-                    <th className='px-6 py-3 font-medium text-gray-400'>
-                      Description
-                    </th>
-                    <th className='px-6 py-3 text-right font-medium text-gray-400'>
-                      Amount
-                    </th>
-                  </tr>
-                </thead>
+      {errors.length > 0 && (
+        <div className='rounded-3xl border border-white/10 bg-white/5 p-6'>
+          <h2 className='mb-4 font-bold'>Rows Skipped</h2>
 
-                <tbody>
-                  {validRows.map((row, index) => (
-                    <tr key={index} className='border-t border-gray-800'>
-                      <td className='px-6 py-4 text-gray-300'>
-                        {new Date(row.date).toLocaleDateString()}
-                      </td>
-
-                      <td className='px-6 py-4 text-white'>
-                        {row.description}
-                      </td>
-
-                      <td className='px-6 py-4 text-right font-medium'>
-                        {row.amount.toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-        {errors.length > 0 && (
-          <div className='mt-8'>
-            <h2 className='text-xl font-semibold mb-4'>Import Errors</h2>
-
-            <div className='space-y-2'>
-              {errors.map((error, index) => (
-                <div
-                  key={index}
-                  className='rounded-md border border-red-800 p-3'
-                >
-                  {error.rowNumber && (
-                    <span className='font-medium'>Row {error.rowNumber}: </span>
+          <div className='space-y-2'>
+            {errors.map((error, index) => (
+              <div
+                key={index}
+                className='flex items-start gap-3 rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm'
+              >
+                <AlertCircle className='mt-0.5 h-4 w-4 shrink-0 text-destructive' />
+                <p className='text-gray-200'>
+                  {error.row !== undefined && (
+                    <span className='font-semibold text-destructive'>
+                      Row {error.row}:{' '}
+                    </span>
                   )}
-
-                  <span>{error.message}</span>
-                </div>
-              ))}
-            </div>
+                  {error.message}
+                </p>
+              </div>
+            ))}
           </div>
-        )}
-        <button
-          type='button'
-          onClick={handleParse}
-          disabled={!file || isParsing}
-          className='rounded-md bg-white px-5 py-2 font-semibold text-black disabled:opacity-50'
-        >
-          {isParsing ? 'Parsing...' : 'Upload & Preview'}
-        </button>
-      </div>
+        </div>
+      )}
+
+      {batchId && validRows.length > 0 && (
+        <div className='rounded-3xl border border-white/10 bg-white/5 p-8'>
+          <div className='mb-5'>
+            <h2 className='text-lg font-bold'>Choose an Offset Account</h2>
+            <p className='mt-1 text-sm text-gray-400'>
+              Every imported transaction needs a counterparty account for the
+              other side of the entry — e.g. Revenue for money in, Expenses for
+              money out.
+            </p>
+          </div>
+
+          <AccountSelector
+            label='Offset Account'
+            placeholder='Select offset account'
+            onSelect={(id) => {
+              setOffsetAccountId(id);
+              setCommitError(null);
+            }}
+          />
+
+          {commitError && (
+            <p className='mt-3 text-sm text-destructive'>{commitError}</p>
+          )}
+
+          <Button
+            onClick={handleCommit}
+            disabled={!offsetAccountId || isCommitting}
+            className='mt-5 h-12 w-full rounded-xl font-bold text-black'
+          >
+            {isCommitting ? (
+              <>
+                <Loader2 className='h-4 w-4 animate-spin' />
+                Importing...
+              </>
+            ) : (
+              'Confirm Import'
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
