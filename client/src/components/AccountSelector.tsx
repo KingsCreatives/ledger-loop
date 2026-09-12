@@ -19,12 +19,14 @@ interface Account {
 interface AccountSelectorProps {
   label: string;
   placeholder?: string;
+  disabled?: boolean;
   onSelect: (accountId: string) => void;
 }
 
 export const AccountSelector = ({
   label,
   placeholder,
+  disabled,
   onSelect,
 }: AccountSelectorProps) => {
   const [accounts, setAccounts] = useState<Account[]>([]);
@@ -46,7 +48,7 @@ export const AccountSelector = ({
       <Label className='text-gray-400 text-xs uppercase tracking-widest'>
         {label}
       </Label>
-      <Select onValueChange={onSelect}>
+      <Select disabled={disabled} onValueChange={onSelect}>
         <SelectTrigger className='w-full bg-white/5 border-white/10 rounded-xl focus:ring-blue-500'>
           <SelectValue placeholder={placeholder || 'Select account'} />
         </SelectTrigger>

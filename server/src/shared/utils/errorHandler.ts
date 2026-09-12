@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { AppError } from '../utils/errors';
+import { AppError } from '../utils/errors.js';
 
 export const errorHandler = (
   error: unknown,
@@ -12,6 +12,8 @@ export const errorHandler = (
     console.error(error);
     return res.status(error.statusCode).json({ message: error.message });
   }
+
+  console.error(error);
 
   return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
     message: 'An unexpected error occurred',
