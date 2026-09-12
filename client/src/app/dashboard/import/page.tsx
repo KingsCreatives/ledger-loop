@@ -48,6 +48,7 @@ function ImportPageContent() {
 
   const [isLoading, setIsLoading] = useState(true);
   const [account, setAccount] = useState<AccountInfo | null>(null);
+  const [hasOffsetOptions, setHasOffsetOptions] = useState(true);
 
   const [file, setFile] = useState<File | null>(null);
   const [isParsing, setIsParsing] = useState(false);
@@ -55,6 +56,8 @@ function ImportPageContent() {
   const [validRows, setValidRows] = useState<ValidRow[]>([]);
   const [errors, setErrors] = useState<ImportError[]>([]);
   const [batchId, setBatchId] = useState<string | null>(null);
+
+  const [parseError, setParseError] = useState('');
 
   const [offsetAccountId, setOffsetAccountId] = useState<string | null>(null);
   const [isCommitting, setIsCommitting] = useState(false);
@@ -66,6 +69,7 @@ function ImportPageContent() {
     setBatchId(null);
     setOffsetAccountId(null);
     setCommitError(null);
+    setParseError('');
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -86,11 +90,20 @@ function ImportPageContent() {
       return;
     }
 
-    const fetchAccount = async () => {
+    const fetchData = async () => {
       setIsLoading(true);
       try {
-        const response = await api.get(`/accounts/${accountId}`);
-        setAccount(response.data);
+        const [accountResponse, allAccountsResponse] = await Promise.all([
+          api.get(`/accounts/${accountId}`),
+          api.get('/accounts'),
+        ]);
+
+        setAccount(accountResponse.data);
+
+        const otherAccounts = allAccountsResponse.data.filter(
+          (acc: AccountInfo) => acc.id !== accountId,
+        );
+        setHasOffsetOptions(otherAccounts.length > 0);
       } catch (error) {
         console.error('Failed to fetch account:', error);
         router.replace('/dashboard/accounts');
@@ -99,7 +112,7 @@ function ImportPageContent() {
       }
     };
 
-    fetchAccount();
+    fetchData();
   }, [accountId, router]);
 
   const handleParse = async () => {
@@ -118,8 +131,12 @@ function ImportPageContent() {
       setValidRows(response.data.validRows);
       setErrors(response.data.errors);
       setBatchId(response.data.batchId);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to parse import:', error);
+      setParseError(
+        error.response?.data?.message ??
+          'Failed to parse this file. Please try again.',
+      );
     } finally {
       setIsParsing(false);
     }
@@ -164,6 +181,7 @@ function ImportPageContent() {
   }
 
   const hasResults = validRows.length > 0 || errors.length > 0;
+  const allRowsFailed = errors.length > 0 && validRows.length === 0;
 
   return (
     <div className='max-w-5xl mx-auto space-y-6'>
@@ -188,7 +206,11 @@ function ImportPageContent() {
 
         <label
           htmlFor='statement-file'
-          className='flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-white/20 bg-white/5 px-6 py-12 transition-all hover:border-primary/50 hover:bg-white/10'
+          className={`flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/20 bg-white/5 px-6 py-12 transition-all ${
+            isParsing
+              ? 'pointer-events-none opacity-50'
+              : 'cursor-pointer hover:border-primary/50 hover:bg-white/10'
+          }`}
         >
           <div className='mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary'>
             {file ? (
@@ -220,6 +242,7 @@ function ImportPageContent() {
             type='file'
             accept='.csv,text/csv'
             onChange={handleFileChange}
+            disabled={isParsing}
             className='hidden'
           />
         </label>
@@ -240,6 +263,10 @@ function ImportPageContent() {
             )}
           </Button>
         </div>
+
+        {parseError && (
+          <p className='mt-3 text-sm text-destructive'>{parseError}</p>
+        )}
       </div>
 
       {hasResults && (
@@ -330,6 +357,13 @@ function ImportPageContent() {
               </div>
             ))}
           </div>
+
+          {allRowsFailed && (
+            <p className='mt-4 text-sm text-gray-400'>
+              None of the rows in this file could be imported. Fix the issues
+              above in your source file and upload it again.
+            </p>
+          )}
         </div>
       )}
 
@@ -344,33 +378,43 @@ function ImportPageContent() {
             </p>
           </div>
 
-          <AccountSelector
-            label='Offset Account'
-            placeholder='Select offset account'
-            onSelect={(id) => {
-              setOffsetAccountId(id);
-              setCommitError(null);
-            }}
-          />
+          {hasOffsetOptions ? (
+            <>
+              <AccountSelector
+                label='Offset Account'
+                placeholder='Select offset account'
+                disabled={isCommitting}
+                onSelect={(id) => {
+                  setOffsetAccountId(id);
+                  setCommitError(null);
+                }}
+              />
 
-          {commitError && (
-            <p className='mt-3 text-sm text-destructive'>{commitError}</p>
+              {commitError && (
+                <p className='mt-3 text-sm text-destructive'>{commitError}</p>
+              )}
+
+              <Button
+                onClick={handleCommit}
+                disabled={!offsetAccountId || isCommitting}
+                className='mt-5 h-12 w-full rounded-xl font-bold text-black'
+              >
+                {isCommitting ? (
+                  <>
+                    <Loader2 className='h-4 w-4 animate-spin' />
+                    Importing...
+                  </>
+                ) : (
+                  'Confirm Import'
+                )}
+              </Button>
+            </>
+          ) : (
+            <p className='rounded-xl border border-white/10 bg-white/5 p-4 text-sm text-gray-400'>
+              You need at least one other account to serve as the offset (e.g. a
+              Revenue or Expense account) before you can commit this import.
+            </p>
           )}
-
-          <Button
-            onClick={handleCommit}
-            disabled={!offsetAccountId || isCommitting}
-            className='mt-5 h-12 w-full rounded-xl font-bold text-black'
-          >
-            {isCommitting ? (
-              <>
-                <Loader2 className='h-4 w-4 animate-spin' />
-                Importing...
-              </>
-            ) : (
-              'Confirm Import'
-            )}
-          </Button>
         </div>
       )}
     </div>

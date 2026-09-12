@@ -65,21 +65,23 @@ export default function AccountDetailsPage({
 
   return (
     <div className='max-w-5xl mx-auto'>
-      <Link
-        href='/dashboard/accounts'
-        className='inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-bold transition hover:bg-white/10 mb-8'
-      >
-        <ArrowLeft className='h-4 w-4' />
-        Back to Accounts
-      </Link>
+      <div className='flex items-center justify-between mb-8'>
+        <Link
+          href='/dashboard/accounts'
+          className='inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-bold transition hover:bg-white/10'
+        >
+          <ArrowLeft className='h-4 w-4' />
+          Back to Accounts
+        </Link>
 
-      <Link
-        href={`/dashboard/import?accountId=${accountId}`}
-        className='inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-sm font-bold transition hover:bg-white/10 mb-8'
-      >
-        <ArrowRight className='h-4 w-4' />
-        Import Statement
-      </Link>
+        <Link
+          href={`/dashboard/import?accountId=${accountId}`}
+          className='inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2 text-sm font-bold text-black transition hover:bg-primary/90'
+        >
+          <ArrowRight className='h-4 w-4' />
+          Import Statement
+        </Link>
+      </div>
 
       <div className='mb-8'>
         <h1 className='text-4xl font-bold tracking-tight'>
