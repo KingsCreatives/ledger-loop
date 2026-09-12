@@ -14,6 +14,8 @@ export class ImportController {
         });
       }
 
+      const contentHash = ImportService.computeContentHash(file.buffer)
+
       const { accountId } = req.body;
       const userId = req.session.userId!;
 
@@ -25,6 +27,7 @@ export class ImportController {
         accountId,
         filename: file.originalname,
         validRows,
+        contentHash,
         errors,
       });
 

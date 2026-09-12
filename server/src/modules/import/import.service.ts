@@ -4,13 +4,21 @@ import { ParsedCsvRow, ValidatedImportRow } from './import.types';
 import { validateRowSchema } from './import.schema';
 import { prisma } from '../../shared/utils/prisma';
 import { ImportStatus } from '../../../generated/prisma/enums';
-import { NotFoundError, ValidationError } from '../../shared/utils/errors';
+import {
+  ConflictError,
+  NotFoundError,
+  ValidationError,
+} from '../../shared/utils/errors';
 import { LineType } from '../../../generated/prisma/enums';
 import { CreateJournalEntryDTO } from '../../modules/ledger/ledger.types';
 import { LedgerService } from '../ledger/ledger.service';
 import { ImportRow } from '../../../generated/prisma/client';
+import crypto from 'node:crypto'
 
 export class ImportService {
+  static computeContentHash(buffer: Buffer): string {
+    return crypto.createHash('sha256').update(buffer).digest('hex');
+  }
   static async parseCSV(buffer: Buffer): Promise<ParsedCsvRow[]> {
     const rows: ParsedCsvRow[] = [];
 
@@ -95,6 +103,7 @@ export class ImportService {
     userId: string;
     accountId: string;
     filename: string;
+    contentHash: string;
     validRows: ValidatedImportRow[];
     errors: {
       row: number;
@@ -102,7 +111,8 @@ export class ImportService {
       raw: ParsedCsvRow;
     }[];
   }) {
-    const { userId, accountId, filename, validRows, errors } = params;
+
+    const { userId, accountId, filename, validRows, errors, contentHash } = params;
 
     const account = await prisma.account.findUnique({
       where: {
@@ -117,6 +127,16 @@ export class ImportService {
       );
     }
 
+    const existingBatch = await prisma.importBatch.findFirst({
+      where: { accountId, contentHash },
+    });
+
+    if (existingBatch) {
+      throw new ConflictError(
+        'This statement has already been imported for this account.',
+      );
+    }
+
     return prisma.$transaction(
       async (tx: {
         importBatch: {
@@ -125,6 +145,7 @@ export class ImportService {
               userId: string;
               accountId: string;
               filename: string;
+              contentHash: string;
               status: any;
             };
           }) => any;
@@ -146,6 +167,7 @@ export class ImportService {
           data: {
             userId,
             accountId,
+            contentHash,
             filename,
             status: ImportStatus.VALIDATED,
           },

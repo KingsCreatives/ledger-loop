@@ -88,10 +88,13 @@ model ImportBatch {
 
   importRows ImportRow[]
 
-  filename String
-  status   ImportStatus @default(UPLOADED)
+  filename    String
+  contentHash String 
+  status      ImportStatus @default(UPLOADED)
 
   createdAt DateTime @default(now())
+
+  @@unique([accountId, contentHash])
 }
 
 model ImportRow {
