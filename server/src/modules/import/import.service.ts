@@ -13,7 +13,7 @@ import { LineType } from '../../../generated/prisma/enums';
 import { CreateJournalEntryDTO } from '../../modules/ledger/ledger.types';
 import { LedgerService } from '../ledger/ledger.service';
 import { ImportRow } from '../../../generated/prisma/client';
-import crypto from 'node:crypto'
+import crypto from 'node:crypto';
 
 export class ImportService {
   static computeContentHash(buffer: Buffer): string {
@@ -111,8 +111,8 @@ export class ImportService {
       raw: ParsedCsvRow;
     }[];
   }) {
-
-    const { userId, accountId, filename, validRows, errors, contentHash } = params;
+    const { userId, accountId, filename, validRows, errors, contentHash } =
+      params;
 
     const account = await prisma.account.findUnique({
       where: {
@@ -127,14 +127,32 @@ export class ImportService {
       );
     }
 
+    // const existingBatch = await prisma.importBatch.findFirst({
+    //   where: { accountId, contentHash },
+    // });
+
+    // if (existingBatch) {
+    //   throw new ConflictError(
+    //     'This statement has already been imported for this account.',
+    //   );
+    // }
     const existingBatch = await prisma.importBatch.findFirst({
       where: { accountId, contentHash },
     });
 
     if (existingBatch) {
-      throw new ConflictError(
-        'This statement has already been imported for this account.',
-      );
+      if (existingBatch.status === ImportStatus.COMMITTED) {
+        throw new ConflictError(
+          'This statement has already been imported for this account.',
+        );
+      }
+
+      await prisma.importRow.deleteMany({
+        where: { batchId: existingBatch.id },
+      });
+      await prisma.importBatch.delete({
+        where: { id: existingBatch.id },
+      });
     }
 
     return prisma.$transaction(
