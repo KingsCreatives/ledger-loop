@@ -1,7 +1,8 @@
 import { Request, Response, RequestHandler } from 'express';
 import { StatusCodes } from 'http-status-codes';
-import { asyncHandler } from '../../shared/utils/asyncHandler';
-import { ImportService } from './import.service';
+import { asyncHandler } from '../../shared/utils/asyncHandler.js';
+import { ImportService } from './import.service.js';
+import { MatchingService } from '../reconciliation/matching.service.js';
 
 export class ImportController {
   static parse: RequestHandler = asyncHandler(
@@ -22,6 +23,8 @@ export class ImportController {
       const rows = await ImportService.parseCSV(file.buffer);
       const { validRows, errors } = ImportService.validateRows(rows);
 
+      const matchResults = await MatchingService.classifyImportRows(validRows,accountId)
+
       const batch = await ImportService.stageImport({
         userId,
         accountId,
@@ -36,6 +39,7 @@ export class ImportController {
         status: batch.status,
         validCount: validRows.length,
         errorCount: errors.length,
+        matchResults,
         validRows,
         errors,
       });
