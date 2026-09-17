@@ -22,6 +22,7 @@ interface AccountInfo {
 }
 
 interface ValidRow {
+  rowNumber: number;
   date: string;
   description: string;
   amount: number;
@@ -32,11 +33,33 @@ interface ImportError {
   message: string;
 }
 
+interface MatchCandidate {
+  id: string;
+  type: 'DEBIT' | 'CREDIT';
+  amount: number;
+  journalEntryLine: {
+    date: string;
+    description: string;
+  };
+}
+
+type RowDecision =
+  | { status: 'LINKED'; candidateId: string }
+  | { status: 'NONE' }
+  | { status: 'UNDECIDED' };
+
+interface MatchResult {
+  rowNumber: number;
+  status: 'NO_MATCH' | 'SUGGESTED_MATCH' | 'AMBIGUOUS';
+  candidates: MatchCandidate[];
+}
+
 interface ParseResponse {
   batchId: string;
   status: string;
   validCount: number;
   errorCount: number;
+  matchResults: MatchResult[];
   validRows: ValidRow[];
   errors: ImportError[];
 }
@@ -56,6 +79,8 @@ function ImportPageContent() {
   const [validRows, setValidRows] = useState<ValidRow[]>([]);
   const [errors, setErrors] = useState<ImportError[]>([]);
   const [batchId, setBatchId] = useState<string | null>(null);
+  const [matchResults, setMatchResults] = useState<MatchResult[]>([]);
+  const [decisions, setDecisions] = useState<Record<number, RowDecision>>({});
 
   const [parseError, setParseError] = useState('');
 
@@ -63,13 +88,23 @@ function ImportPageContent() {
   const [isCommitting, setIsCommitting] = useState(false);
   const [commitError, setCommitError] = useState<string | null>(null);
 
+  const getMatchResult = (rowNumber: number): MatchResult | undefined => {
+    return matchResults.find((m) => m.rowNumber === rowNumber);
+  };
+
   const resetParseState = () => {
     setValidRows([]);
     setErrors([]);
     setBatchId(null);
+    setMatchResults([]);
+    setDecisions({});
     setOffsetAccountId(null);
     setCommitError(null);
     setParseError('');
+  };
+
+  const setRowDecision = (rowNumber: number, decision: RowDecision) => {
+    setDecisions((prev) => ({ ...prev, [rowNumber]: decision }));
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -131,6 +166,15 @@ function ImportPageContent() {
       setValidRows(response.data.validRows);
       setErrors(response.data.errors);
       setBatchId(response.data.batchId);
+      setMatchResults(response.data.matchResults);
+
+      const initialDecisions: Record<number, RowDecision> = {};
+      for (const row of response.data.matchResults) {
+        if (row.status === 'SUGGESTED_MATCH' || row.status === 'AMBIGUOUS') {
+          initialDecisions[row.rowNumber] = { status: 'UNDECIDED' };
+        }
+      }
+      setDecisions(initialDecisions);
     } catch (error: any) {
       console.error('Failed to parse import:', error);
       setParseError(
@@ -182,6 +226,16 @@ function ImportPageContent() {
 
   const hasResults = validRows.length > 0 || errors.length > 0;
   const allRowsFailed = errors.length > 0 && validRows.length === 0;
+
+  const noMatchRows = validRows.filter(
+    (row) => getMatchResult(row.rowNumber)?.status === 'NO_MATCH',
+  );
+  const suggestedRows = validRows.filter(
+    (row) => getMatchResult(row.rowNumber)?.status === 'SUGGESTED_MATCH',
+  );
+  const ambiguousRows = validRows.filter(
+    (row) => getMatchResult(row.rowNumber)?.status === 'AMBIGUOUS',
+  );
 
   return (
     <div className='max-w-5xl mx-auto space-y-6'>
@@ -284,7 +338,9 @@ function ImportPageContent() {
         </div>
       )}
 
-      {validRows.length > 0 && (
+      
+
+      {/* {validRows.length > 0 && (
         <div className='overflow-hidden rounded-3xl border border-white/10 bg-white/5'>
           <div className='border-b border-white/10 px-6 py-4'>
             <h2 className='font-bold'>Valid Transactions</h2>
@@ -331,6 +387,205 @@ function ImportPageContent() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )} */}
+
+      {noMatchRows.length > 0 && (
+        <div className='rounded-3xl border border-white/10 bg-white/5 p-6'>
+          <h2 className='mb-1 font-bold'>No Match Found</h2>
+          <p className='mb-4 text-sm text-gray-400'>
+            These don't match anything already in your books — they'll be
+            created as new entries.
+          </p>
+          <div className='space-y-2'>
+            {noMatchRows.map((row) => (
+              <div
+                key={row.rowNumber}
+                className='flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm'
+              >
+                <div>
+                  <p className='font-medium text-white'>{row.description}</p>
+                  <p className='text-gray-400'>
+                    {new Date(row.date).toLocaleDateString()}
+                  </p>
+                </div>
+                <span
+                  className={`font-semibold ${
+                    row.amount < 0 ? 'text-destructive' : 'text-primary'
+                  }`}
+                >
+                  {formatCurrency(row.amount)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {suggestedRows.length > 0 && (
+        <div className='rounded-3xl border border-white/10 bg-white/5 p-6'>
+          <h2 className='mb-1 font-bold'>Suggested Matches</h2>
+          <p className='mb-4 text-sm text-gray-400'>
+            These look like entries you've already recorded. Confirm to mark
+            them reconciled instead of creating duplicates.
+          </p>
+          <div className='space-y-4'>
+            {suggestedRows.map((row) => {
+              const match = getMatchResult(row.rowNumber);
+              const candidate = match?.candidates[0];
+              const decision = decisions[row.rowNumber];
+              if (!candidate) return null;
+
+              return (
+                <div
+                  key={row.rowNumber}
+                  className='rounded-2xl border border-white/10 bg-white/5 p-4'
+                >
+                  <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+                    <div>
+                      <p className='text-xs uppercase tracking-widest text-gray-500'>
+                        From Statement
+                      </p>
+                      <p className='mt-1 font-medium text-white'>
+                        {row.description}
+                      </p>
+                      <p className='text-sm text-gray-400'>
+                        {new Date(row.date).toLocaleDateString()} —{' '}
+                        {formatCurrency(row.amount)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className='text-xs uppercase tracking-widest text-gray-500'>
+                        Already in Your Books
+                      </p>
+                      <p className='mt-1 font-medium text-white'>
+                        {candidate.journalEntryLine.description}
+                      </p>
+                      <p className='text-sm text-gray-400'>
+                        {new Date(
+                          candidate.journalEntryLine.date,
+                        ).toLocaleDateString()}{' '}
+                        — {formatCurrency(candidate.amount)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className='mt-4 flex items-center gap-3'>
+                    <Button
+                      type='button'
+                      variant={
+                        decision?.status === 'LINKED' ? 'default' : 'outline'
+                      }
+                      onClick={() =>
+                        setRowDecision(row.rowNumber, {
+                          status: 'LINKED',
+                          candidateId: candidate.id,
+                        })
+                      }
+                      className='h-9 rounded-lg px-4 text-xs font-bold'
+                    >
+                      Yes, same transaction
+                    </Button>
+                    <Button
+                      type='button'
+                      variant={
+                        decision?.status === 'NONE' ? 'default' : 'outline'
+                      }
+                      onClick={() =>
+                        setRowDecision(row.rowNumber, { status: 'NONE' })
+                      }
+                      className='h-9 rounded-lg px-4 text-xs font-bold'
+                    >
+                      No, create as new
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {ambiguousRows.length > 0 && (
+        <div className='rounded-3xl border border-white/10 bg-white/5 p-6'>
+          <h2 className='mb-1 font-bold'>Needs Your Input</h2>
+          <p className='mb-4 text-sm text-gray-400'>
+            Multiple existing entries could match these. Pick the right one, or
+            choose "none of these" to create a new entry.
+          </p>
+          <div className='space-y-4'>
+            {ambiguousRows.map((row) => {
+              const match = getMatchResult(row.rowNumber);
+              const decision = decisions[row.rowNumber];
+              if (!match) return null;
+
+              return (
+                <div
+                  key={row.rowNumber}
+                  className='rounded-2xl border border-white/10 bg-white/5 p-4'
+                >
+                  <p className='text-xs uppercase tracking-widest text-gray-500'>
+                    From Statement
+                  </p>
+                  <p className='mt-1 font-medium text-white'>
+                    {row.description}
+                  </p>
+                  <p className='mb-4 text-sm text-gray-400'>
+                    {new Date(row.date).toLocaleDateString()} —{' '}
+                    {formatCurrency(row.amount)}
+                  </p>
+
+                  <p className='mb-2 text-xs uppercase tracking-widest text-gray-500'>
+                    Which one is this?
+                  </p>
+                  <div className='space-y-2'>
+                    {match.candidates.map((candidate) => (
+                      <button
+                        key={candidate.id}
+                        type='button'
+                        onClick={() =>
+                          setRowDecision(row.rowNumber, {
+                            status: 'LINKED',
+                            candidateId: candidate.id,
+                          })
+                        }
+                        className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-sm transition-colors ${
+                          decision?.status === 'LINKED' &&
+                          decision.candidateId === candidate.id
+                            ? 'border-primary bg-primary/10'
+                            : 'border-white/10 bg-white/5 hover:bg-white/10'
+                        }`}
+                      >
+                        <span className='text-white'>
+                          {candidate.journalEntryLine.description}
+                        </span>
+                        <span className='text-gray-400'>
+                          {new Date(
+                            candidate.journalEntryLine.date,
+                          ).toLocaleDateString()}{' '}
+                          — {formatCurrency(candidate.amount)}
+                        </span>
+                      </button>
+                    ))}
+
+                    <button
+                      type='button'
+                      onClick={() =>
+                        setRowDecision(row.rowNumber, { status: 'NONE' })
+                      }
+                      className={`w-full rounded-xl border px-4 py-3 text-left text-sm transition-colors ${
+                        decision?.status === 'NONE'
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-white/10 bg-white/5 text-gray-400 hover:bg-white/10'
+                      }`}
+                    >
+                      None of these — create as new
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
