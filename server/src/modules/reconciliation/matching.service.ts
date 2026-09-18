@@ -4,7 +4,8 @@ import { prisma } from '../../shared/utils/prisma.js';
 import { ImportRowClassification, MatchingType } from './matching.types.js';
 
 export class MatchingService {
-  private static readonly DATE_TOLERANCE_DAYS = 5;
+  
+  static readonly DATE_TOLERANCE_DAYS = 5;
 
   static async findCandidates(row: ValidatedImportRow, accountId: string) {
     const lineType = row.amount > 0 ? LineType.DEBIT : LineType.CREDIT;

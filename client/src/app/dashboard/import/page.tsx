@@ -196,6 +196,16 @@ function ImportPageContent() {
       return;
     }
 
+    const decisionsPayload = Object.entries(decisions)
+      .filter(([, decision]) => decision.status !== 'UNDECIDED')
+      .map(([rowNumber, decision]) => ({
+        rowNumber: Number(rowNumber),
+        status: decision.status,
+        ...(decision.status === 'LINKED'
+          ? { candidateId: decision.candidateId }
+          : {}),
+      }));
+
     setCommitError(null);
     setIsCommitting(true);
 
@@ -203,6 +213,7 @@ function ImportPageContent() {
       await api.post('/import/commit', {
         batchId,
         offsetAccountId,
+        decisions: decisionsPayload,
       });
 
       router.push(`/dashboard/accounts/${accountId}`);

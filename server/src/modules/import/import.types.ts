@@ -1,3 +1,5 @@
+import { number, string } from 'zod';
+
 export interface ParsedCsvRow {
   date: string;
   description: string;
@@ -10,3 +12,14 @@ export interface ValidatedImportRow {
   amount: number; // stored as integer cents, e.g. 1250 = $12.50
   rowNumber: number;
 }
+
+export type ImportRowDecision =
+  | {
+      rowNumber: number;
+      status: 'LINKED';
+      candidateId: string;
+    }
+  | {
+      rowNumber: number;
+      status: 'NONE';
+    };

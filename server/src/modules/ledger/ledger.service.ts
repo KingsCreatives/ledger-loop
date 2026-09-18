@@ -51,6 +51,7 @@ export class LedgerService {
       data: {
         date: data.date,
         description: data.description,
+        source: data.source,
         lines: { create: data.lines },
       },
     });

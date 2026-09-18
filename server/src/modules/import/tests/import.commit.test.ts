@@ -1,7 +1,11 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { ImportService } from '../import.service.js';
 import { prisma } from '../../../shared/utils/prisma.js';
-import { AccountType, ImportStatus, LineType } from '../../../../generated/prisma/enums.js';
+import {
+  AccountType,
+  ImportStatus,
+  LineType,
+} from '../../../../generated/prisma/enums.js';
 
 describe('ImportService.commitImport', () => {
   let userId: string;
@@ -48,6 +52,7 @@ describe('ImportService.commitImport', () => {
       userId,
       accountId,
       filename: `statement-${Date.now()}.csv`,
+      contentHash: 'commit-test-hash-1',
 
       validRows: [
         {
@@ -65,12 +70,14 @@ describe('ImportService.commitImport', () => {
       batch.id,
       offsetAccountId,
       userId,
+      [{ rowNumber: 1, status: 'NONE' }],
     );
 
     expect(result).toEqual({
       batchId: batch.id,
-      imported: 1,
-      status: 'COMMITTED',
+      created: 1,
+      reconciled: 0,
+      status: ImportStatus.COMMITTED,
     });
 
     const committedBatch = await prisma.importBatch.findUnique({
@@ -81,19 +88,19 @@ describe('ImportService.commitImport', () => {
 
     expect(committedBatch?.status).toBe('COMMITTED');
 
-   const journalEntry = await prisma.journalEntry.findFirst({
-     where: {
-       description: 'Salary',
-       lines: {
-         some: {
-           accountId,
-         },
-       },
-     },
-     include: {
-       lines: true,
-     },
-   });
+    const journalEntry = await prisma.journalEntry.findFirst({
+      where: {
+        description: 'Salary',
+        lines: {
+          some: {
+            accountId,
+          },
+        },
+      },
+      include: {
+        lines: true,
+      },
+    });
 
     expect(journalEntry).not.toBeNull();
     expect(journalEntry?.date).toEqual(new Date('2026-08-01'));
@@ -101,11 +108,11 @@ describe('ImportService.commitImport', () => {
     expect(journalEntry?.lines).toHaveLength(2);
 
     const bankLine = journalEntry?.lines.find(
-      (line: { accountId: string; }) => line.accountId === accountId,
+      (line: { accountId: string }) => line.accountId === accountId,
     );
 
     const offsetLine = journalEntry?.lines.find(
-      (line: { accountId: string; }) => line.accountId === offsetAccountId,
+      (line: { accountId: string }) => line.accountId === offsetAccountId,
     );
 
     expect(bankLine?.type).toBe(LineType.DEBIT);
@@ -116,19 +123,20 @@ describe('ImportService.commitImport', () => {
   });
 
   it('should reject an import that is not validated', async () => {
-    const batch = await prisma.importBatch.create({
-      data: {
-        filename: `pending-${Date.now()}.csv`,
-        status: ImportStatus.UPLOADED,
-        userId,
-        accountId,
-      },
-    });
+   const batch = await prisma.importBatch.create({
+     data: {
+       filename: `pending-${Date.now()}.csv`,
+       contentHash: `pending-hash-${Date.now()}`,
+       status: ImportStatus.UPLOADED,
+       userId,
+       accountId,
+     },
+   });
 
     const journalEntriesBefore = await prisma.journalEntry.count();
 
     await expect(
-      ImportService.commitImport(batch.id, offsetAccountId, userId),
+      ImportService.commitImport(batch.id, offsetAccountId, userId, []),
     ).rejects.toThrow();
 
     const updatedBatch = await prisma.importBatch.findUnique({
@@ -152,6 +160,7 @@ describe('ImportService.commitImport', () => {
       userId,
       accountId,
       filename: `multiple-${Date.now()}.csv`,
+      contentHash: 'commit-test-hash-2',
 
       validRows: [
         {
@@ -175,11 +184,16 @@ describe('ImportService.commitImport', () => {
       batch.id,
       offsetAccountId,
       userId,
+      [
+        { rowNumber: 1, status: 'NONE' },
+        { rowNumber: 2, status: 'NONE' },
+      ],
     );
 
     expect(result).toEqual({
       batchId: batch.id,
-      imported: 2,
+      created: 2,
+      reconciled: 0,
       status: ImportStatus.COMMITTED,
     });
 
@@ -205,22 +219,24 @@ describe('ImportService.commitImport', () => {
     expect(journalEntries).toHaveLength(2);
 
     const salaryEntry = journalEntries.find(
-      (entry: { description: string; }) => entry.description === salaryDescription,
+      (entry: { description: string }) =>
+        entry.description === salaryDescription,
     );
 
     const freelanceEntry = journalEntries.find(
-      (entry: { description: string; }) => entry.description === freelanceDescription,
+      (entry: { description: string }) =>
+        entry.description === freelanceDescription,
     );
 
     expect(salaryEntry?.lines).toHaveLength(2);
     expect(freelanceEntry?.lines).toHaveLength(2);
 
     const salaryBankLine = salaryEntry?.lines.find(
-      (line: { accountId: string; }) => line.accountId === accountId,
+      (line: { accountId: string }) => line.accountId === accountId,
     );
 
     const freelanceBankLine = freelanceEntry?.lines.find(
-      (line: { accountId: string; }) => line.accountId === accountId,
+      (line: { accountId: string }) => line.accountId === accountId,
     );
 
     expect(salaryBankLine?.amount).toBe(500000);
@@ -238,6 +254,7 @@ describe('ImportService.commitImport', () => {
       userId,
       accountId,
       filename: `invalid-rows-${timestamp}.csv`,
+      contentHash: 'commit-test-hash-3',
 
       validRows: [
         {
@@ -271,11 +288,16 @@ describe('ImportService.commitImport', () => {
       batch.id,
       offsetAccountId,
       userId,
+      [
+        { rowNumber: 1, status: 'NONE' },
+        { rowNumber: 3, status: 'NONE' },
+      ],
     );
 
     expect(result).toEqual({
       batchId: batch.id,
-      imported: 2,
+      created: 2,
+      reconciled: 0,
       status: ImportStatus.COMMITTED,
     });
 
@@ -293,15 +315,20 @@ describe('ImportService.commitImport', () => {
     expect(journalEntries).toHaveLength(2);
 
     expect(
-      journalEntries.some((entry: { description: string; }) => entry.description === invalidDescription),
+      journalEntries.some(
+        (entry: { description: string }) =>
+          entry.description === invalidDescription,
+      ),
     ).toBe(false);
 
     const firstEntry = journalEntries.find(
-      (entry: { description: string; }) => entry.description === validDescription1,
+      (entry: { description: string }) =>
+        entry.description === validDescription1,
     );
 
     const secondEntry = journalEntries.find(
-      (entry: { description: string; }) => entry.description === validDescription2,
+      (entry: { description: string }) =>
+        entry.description === validDescription2,
     );
 
     expect(firstEntry).toBeDefined();
@@ -318,6 +345,7 @@ describe('ImportService.commitImport', () => {
       userId,
       accountId,
       filename: `rollback-${Date.now()}.csv`,
+      contentHash: 'commit-test-hash-4',
 
       validRows: [
         {
@@ -334,7 +362,7 @@ describe('ImportService.commitImport', () => {
     const invalidOffsetAccountId = '00000000-0000-0000-0000-000000000000';
 
     await expect(
-      ImportService.commitImport(batch.id, invalidOffsetAccountId, userId),
+      ImportService.commitImport(batch.id, invalidOffsetAccountId, userId, []),
     ).rejects.toThrow();
 
     const updatedBatch = await prisma.importBatch.findUnique({
@@ -377,6 +405,7 @@ describe('ImportService.commitImport', () => {
       userId: otherUser.id,
       accountId: otherAccount.id,
       filename: `other-user-${Date.now()}.csv`,
+      contentHash: 'commit-test-hash-5',
 
       validRows: [
         {
@@ -395,6 +424,7 @@ describe('ImportService.commitImport', () => {
         batch.id,
         offsetAccountId,
         userId, // different user
+        [],
       ),
     ).rejects.toThrow();
 
@@ -414,6 +444,7 @@ describe('ImportService.commitImport', () => {
       userId,
       accountId,
       filename: `no-valid-rows-${timestamp}.csv`,
+      contentHash: 'commit-test-hash-6',
 
       validRows: [],
 
@@ -433,7 +464,7 @@ describe('ImportService.commitImport', () => {
     const journalEntriesBefore = await prisma.journalEntry.count();
 
     await expect(
-      ImportService.commitImport(batch.id, offsetAccountId, userId),
+      ImportService.commitImport(batch.id, offsetAccountId, userId, []),
     ).rejects.toThrow();
 
     const updatedBatch = await prisma.importBatch.findUnique({
@@ -465,14 +496,15 @@ describe('ImportService.commitImport', () => {
       },
     });
 
-    const batch = await prisma.importBatch.create({
-      data: {
-        filename: `invalid-offset-${Date.now()}.csv`,
-        status: ImportStatus.VALIDATED,
-        userId,
-        accountId,
-      },
-    });
+   const batch = await prisma.importBatch.create({
+     data: {
+       filename: `invalid-offset-${Date.now()}.csv`,
+       contentHash: `invalid-offset-hash-${Date.now()}`,
+       status: ImportStatus.VALIDATED,
+       userId,
+       accountId,
+     },
+   });
 
     await prisma.importRow.create({
       data: {
@@ -486,7 +518,7 @@ describe('ImportService.commitImport', () => {
     });
 
     await expect(
-      ImportService.commitImport(batch.id, otherAccount.id, userId),
+      ImportService.commitImport(batch.id, otherAccount.id, userId, []),
     ).rejects.toThrow();
 
     const updatedBatch = await prisma.importBatch.findUnique({
@@ -500,7 +532,7 @@ describe('ImportService.commitImport', () => {
     const fakeBatchId = '00000000-0000-0000-0000-000000000000';
 
     await expect(
-      ImportService.commitImport(fakeBatchId, offsetAccountId, userId),
+      ImportService.commitImport(fakeBatchId, offsetAccountId, userId, []),
     ).rejects.toThrow();
   });
 });
