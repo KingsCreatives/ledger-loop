@@ -535,4 +535,117 @@ describe('ImportService.commitImport', () => {
       ImportService.commitImport(fakeBatchId, offsetAccountId, userId, []),
     ).rejects.toThrow();
   });
+
+  it('should reconcile an existing transaction line when a row is LINKED', async () => {
+    const journalEntry = await prisma.journalEntry.create({
+      data: {
+        date: new Date('2026-08-01'),
+        description: 'Office Rent',
+        source: 'MANUAL',
+        lines: {
+          create: [
+            {
+              accountId,
+              amount: 50000,
+              type: LineType.CREDIT,
+            },
+            {
+              accountId: offsetAccountId,
+              amount: 50000,
+              type: LineType.DEBIT,
+            },
+          ],
+        },
+      },
+      include: { lines: true },
+    });
+
+    const existingLine = journalEntry.lines.find(
+      (line: { accountId: string }) => line.accountId === accountId,
+    );
+
+    const batch = await ImportService.stageImport({
+      userId,
+      accountId,
+      filename: `linked-test-${Date.now()}.csv`,
+      contentHash: `linked-hash-${Date.now()}`,
+
+      validRows: [
+        {
+          rowNumber: 1,
+          date: new Date('2026-08-03'),
+          description: 'RENT PAYMENT ACH',
+          amount: -50000,
+        },
+      ],
+
+      errors: [],
+    });
+
+    const journalEntriesBefore = await prisma.journalEntry.count();
+
+    const result = await ImportService.commitImport(
+      batch.id,
+      offsetAccountId,
+      userId,
+      [{ rowNumber: 1, status: 'LINKED', candidateId: existingLine!.id }],
+    );
+
+    expect(result).toEqual({
+      batchId: batch.id,
+      created: 0,
+      reconciled: 1,
+      status: ImportStatus.COMMITTED,
+    });
+
+    const journalEntriesAfter = await prisma.journalEntry.count();
+    expect(journalEntriesAfter).toBe(journalEntriesBefore);
+
+    const updatedLine = await prisma.transactionLine.findUnique({
+      where: { id: existingLine!.id },
+    });
+
+    expect(updatedLine?.isReconciled).toBe(true);
+    expect(updatedLine?.reconciledAt).not.toBeNull();
+
+    const updatedRow = await prisma.importRow.findFirst({
+      where: { batchId: batch.id, rowNumber: 1 },
+    });
+
+    expect(updatedRow?.matchLineId).toBe(existingLine!.id);
+  });
+
+  it('should reject a LINKED decision pointing at a nonexistent or unreconcilable candidate', async () => {
+    const batch = await ImportService.stageImport({
+      userId,
+      accountId,
+      filename: `bad-link-${Date.now()}.csv`,
+      contentHash: `bad-link-hash-${Date.now()}`,
+
+      validRows: [
+        {
+          rowNumber: 1,
+          date: new Date('2026-08-01'),
+          description: 'Salary',
+          amount: 500000,
+        },
+      ],
+
+      errors: [],
+    });
+
+    const fakeCandidateId = '00000000-0000-0000-0000-000000000000';
+
+    await expect(
+      ImportService.commitImport(batch.id, offsetAccountId, userId, [
+        { rowNumber: 1, status: 'LINKED', candidateId: fakeCandidateId },
+      ]),
+    ).rejects.toThrow();
+
+    const updatedBatch = await prisma.importBatch.findUnique({
+      where: { id: batch.id },
+    });
+
+    expect(updatedBatch?.status).toBe(ImportStatus.VALIDATED);
+  });
 });

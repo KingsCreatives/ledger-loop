@@ -311,18 +311,16 @@ export class ImportService {
     let reconciled = 0;
 
     for (const row of batch.importRows) {
+
+      if (!row.date || !row.description || row.amount === null) {
+        throw new ValidationError('Invalid import row');
+      }
+      
       const decision = decisions.find(
         (item) => item.rowNumber === row.rowNumber,
       );
 
       if (decision?.status === 'LINKED') {
-        // const candidate = await tx.transactionLine.findFirst({
-        //   where: {
-        //     id: decision.candidateId,
-        //     accountId: batch.accountId,
-        //     isReconciled: false,
-        //   },
-        // });
 
         const candidate = await tx.transactionLine.findFirst({
           where: {
