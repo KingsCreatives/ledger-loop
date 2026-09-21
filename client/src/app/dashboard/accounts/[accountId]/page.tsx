@@ -24,6 +24,18 @@ interface AccountInfo {
   balance: number;
 }
 
+interface ReconciliationItem {
+  id: string;
+  amount: number;
+  type: 'DEBIT' | 'CREDIT';
+  isReconciled: boolean;
+  journalEntryLine: {
+    id: string;
+    date: string;
+    description: string;
+  };
+}
+
 export default function AccountDetailsPage({
   params,
 }: {
@@ -34,17 +46,25 @@ export default function AccountDetailsPage({
   const [isLoading, setIsLoading] = useState(true);
   const [transactions, setTransactions] = useState<AccountHistoryProp[]>([]);
   const [account, setAccount] = useState<AccountInfo | null>(null);
+  const [reconciliationItems, setReconciliationItems] = useState<
+    ReconciliationItem[]
+  >([]);
 
   useEffect(() => {
     const fetchTransactions = async () => {
       setIsLoading(true);
+
       try {
-        const [accountResponse, transactionResponse] = await Promise.all([
-          api.get(`/accounts/${accountId}`),
-          api.get(`/accounts/${accountId}/transactions`),
-        ]);
+        const [accountResponse, transactionResponse, reconciliationResponse] =
+          await Promise.all([
+            api.get(`/accounts/${accountId}`),
+            api.get(`/accounts/${accountId}/transactions`),
+            api.get(`/accounts/${accountId}/reconciliation`),
+          ]);
+
         setAccount(accountResponse.data);
         setTransactions(transactionResponse.data);
+        setReconciliationItems(reconciliationResponse.data);
       } catch (error) {
         console.error('Failed to fetch accounts:', error);
       } finally {
@@ -112,6 +132,7 @@ export default function AccountDetailsPage({
               <h3 className='font-semibold'>
                 {transaction.journalEntryLine.description}
               </h3>
+
               <p
                 className={`text-sm font-semibold ${
                   transaction.type === 'DEBIT'
@@ -121,9 +142,11 @@ export default function AccountDetailsPage({
               >
                 {transaction.type}
               </p>
+
               <p className='text-2xl font-bold'>
                 {formatCurrency(transaction.amount)}
               </p>
+
               <p className='text-xs text-gray-500'>
                 {new Date(
                   transaction.journalEntryLine.date,
@@ -133,6 +156,77 @@ export default function AccountDetailsPage({
           ))}
         </div>
       )}
+
+      {/* Needs Reconciliation */}
+      <div className='mt-10'>
+        <div className='mb-5'>
+          <h2 className='text-2xl font-bold'>Needs Reconciliation</h2>
+
+          <p className='mt-1 text-gray-400'>
+            Transactions that have not yet been reconciled.
+          </p>
+        </div>
+
+        {!reconciliationItems.length ? (
+          <div className='rounded-3xl border border-white/10 bg-white/5 p-8 text-center'>
+            <h3 className='text-xl font-bold'>All caught up</h3>
+
+            <p className='mt-2 text-gray-400'>
+              There are no outstanding reconciliation items.
+            </p>
+          </div>
+        ) : (
+          <div className='space-y-4'>
+            {reconciliationItems.map((item) => {
+              const date = new Date(item.journalEntryLine.date);
+
+              const daysOutstanding = Math.floor(
+                (Date.now() - date.getTime()) / (1000 * 60 * 60 * 24),
+              );
+
+              return (
+                <div
+                  key={item.id}
+                  className='rounded-2xl border border-white/10 bg-white/5 p-5'
+                >
+                  <div className='flex items-start justify-between gap-4'>
+                    <div>
+                      <h3 className='font-semibold'>
+                        {item.journalEntryLine.description}
+                      </h3>
+
+                      <p className='mt-1 text-sm text-gray-400'>
+                        {date.toLocaleDateString()}
+                      </p>
+                    </div>
+
+                    <p className='text-xl font-bold'>
+                      {formatCurrency(item.amount)}
+                    </p>
+                  </div>
+
+                  <div className='mt-4 flex items-center justify-between text-sm'>
+                    <span
+                      className={
+                        item.type === 'DEBIT'
+                          ? 'font-semibold text-green-400'
+                          : 'font-semibold text-red-400'
+                      }
+                    >
+                      {item.type}
+                    </span>
+
+                    <span className='text-gray-500'>
+                      {daysOutstanding} day
+                      {daysOutstanding !== 1 ? 's' : ''} outstanding
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
