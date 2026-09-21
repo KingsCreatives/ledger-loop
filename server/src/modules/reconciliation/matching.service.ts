@@ -4,7 +4,6 @@ import { prisma } from '../../shared/utils/prisma.js';
 import { ImportRowClassification, MatchingType } from './matching.types.js';
 
 export class MatchingService {
-  
   static readonly DATE_TOLERANCE_DAYS = 5;
 
   static async findCandidates(row: ValidatedImportRow, accountId: string) {
@@ -64,5 +63,22 @@ export class MatchingService {
     }
 
     return results;
+  }
+
+  static async getOutstandingItems(accountId: string) {
+    return prisma.transactionLine.findMany({
+      where: {
+        accountId,
+        isReconciled: false,
+      },
+      include: {
+        journalEntryLine: true,
+      },
+      orderBy: {
+        journalEntryLine: {
+          date: 'asc',
+        },
+      },
+    });
   }
 }

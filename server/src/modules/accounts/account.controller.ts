@@ -1,10 +1,11 @@
 import { Request, Response, RequestHandler } from 'express';
-import { AccountService } from './account.service';
-import { createAccountSchema } from './account.schema';
-import { AccountType } from '../../../generated/prisma/enums';
+import { AccountService } from './account.service.js';
+import { createAccountSchema } from './account.schema.js';
+import { AccountType } from '../../../generated/prisma/enums.js';
 import { StatusCodes } from 'http-status-codes';
-import { asyncHandler } from '../../shared/utils/asyncHandler';
-import { getAccountId } from '../../shared/utils/getAccountId';
+import { asyncHandler } from '../../shared/utils/asyncHandler.js';
+import { getAccountId } from '../../shared/utils/getAccountId.js';
+import { MatchingService } from '../reconciliation/matching.service.js';
 
 export class AccountController {
   static createAccount: RequestHandler = asyncHandler(
@@ -66,6 +67,19 @@ export class AccountController {
         req.session.userId!,
       );
       return res.status(StatusCodes.OK).json(transactions);
+    },
+  );
+
+  static getAccountReconciliation: RequestHandler = asyncHandler(
+    async (req: Request, res: Response) => {
+      const accountId = getAccountId(req);
+
+      await AccountService.getAccountInfo(accountId, req.session.userId!);
+
+      const outstandingItems =
+        await MatchingService.getOutstandingItems(accountId);
+
+      return res.status(StatusCodes.OK).json(outstandingItems);
     },
   );
 }
