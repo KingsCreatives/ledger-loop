@@ -4,24 +4,26 @@ import { prisma } from '../../shared/utils/prisma.js';
 import { ImportRowClassification, MatchingType } from './matching.types.js';
 
 export class MatchingService {
+  
   static readonly DATE_TOLERANCE_DAYS = 5;
 
-  static async findCandidates(row: ValidatedImportRow, accountId: string) {
-    const lineType = row.amount > 0 ? LineType.DEBIT : LineType.CREDIT;
-
-    const amount = Math.abs(row.amount);
-
-    const fromDate = new Date(row.date);
+  static async findCandidatesByCriteria(
+    accountId: string,
+    amount: number,
+    lineType: LineType,
+    date: Date,
+  ) {
+    const fromDate = new Date(date);
     fromDate.setDate(fromDate.getDate() - this.DATE_TOLERANCE_DAYS);
 
-    const toDate = new Date(row.date);
+    const toDate = new Date(date);
     toDate.setDate(toDate.getDate() + this.DATE_TOLERANCE_DAYS);
 
     return prisma.transactionLine.findMany({
       where: {
         accountId,
         type: lineType,
-        amount,
+        amount: Math.abs(amount),
         isReconciled: false,
 
         journalEntryLine: {
@@ -37,6 +39,16 @@ export class MatchingService {
     });
   }
 
+  static async findCandidates(row: ValidatedImportRow, accountId: string) {
+    const lineType = row.amount > 0 ? LineType.DEBIT : LineType.CREDIT;
+
+    return this.findCandidatesByCriteria(
+      accountId,
+      row.amount,
+      lineType,
+      row.date,
+    );
+  }
   static async classifyImportRows(
     rows: ValidatedImportRow[],
     accountId: string,

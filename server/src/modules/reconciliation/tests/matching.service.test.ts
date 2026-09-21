@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { prisma } from '../../../shared/utils/prisma.js';
 import { MatchingService } from '../matching.service.js';
+import { LineType } from '../../../../generated/prisma/enums.js';
 
 describe('MatchingService.getOutstandingItems', () => {
   let userId: string;
@@ -85,5 +86,75 @@ describe('MatchingService.getOutstandingItems', () => {
     expect(
       results.some((line: { id: any; }) => line.id === reconciledEntry.lines[0].id),
     ).toBe(false);
+  });
+
+  it('should find unreconciled candidates matching amount, type, and date tolerance', async () => {
+    const entry = await prisma.journalEntry.create({
+      data: {
+        date: new Date('2026-09-03'),
+        description: 'Matching candidate',
+        lines: {
+          create: [
+            {
+              accountId,
+              amount: 50000,
+              type: 'DEBIT',
+              isReconciled: false,
+            },
+          ],
+        },
+      },
+      include: {
+        lines: true,
+      },
+    });
+
+    // Outside the 5-day tolerance
+    await prisma.journalEntry.create({
+      data: {
+        date: new Date('2026-09-15'),
+        description: 'Outside date range',
+        lines: {
+          create: [
+            {
+              accountId,
+              amount: 50000,
+              type: 'DEBIT',
+              isReconciled: false,
+            },
+          ],
+        },
+      },
+    });
+
+    // Same amount/date but already reconciled
+    await prisma.journalEntry.create({
+      data: {
+        date: new Date('2026-09-03'),
+        description: 'Already reconciled',
+        lines: {
+          create: [
+            {
+              accountId,
+              amount: 50000,
+              type: 'DEBIT',
+              isReconciled: true,
+              reconciledAt: new Date(),
+            },
+          ],
+        },
+      },
+    });
+
+    const results = await MatchingService.findCandidatesByCriteria(
+      accountId,
+      50000,
+      LineType.DEBIT,
+      new Date('2026-09-01'),
+    );
+
+    expect(results).toHaveLength(1);
+    expect(results[0].id).toBe(entry.lines[0].id);
+    expect(results[0].journalEntryLine.description).toBe('Matching candidate');
   });
 });
