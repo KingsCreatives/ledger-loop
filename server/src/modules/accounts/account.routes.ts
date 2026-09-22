@@ -22,5 +22,9 @@ accountRouter.get(
   '/:accountId/reconciliation/:lineId/matches',
   AccountController.getAccountReconciliationMatches,
 );
+accountRouter.post(
+  '/:accountId/reconciliation/:lineId/match',
+  AccountController.reconcileAccountLines,
+);
 
 export default accountRouter;

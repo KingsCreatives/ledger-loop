@@ -95,10 +95,7 @@ export class AccountController {
         });
       }
 
-      await AccountService.getAccountInfo(
-        accountId, 
-        req.session.userId!
-      );
+      await AccountService.getAccountInfo(accountId, req.session.userId!);
 
       const result = await MatchingService.findMatchesForLine(
         lineId,
@@ -108,6 +105,42 @@ export class AccountController {
       if (!result) {
         return res.status(StatusCodes.NOT_FOUND).json({
           message: 'Reconciliation item not found.',
+        });
+      }
+
+      return res.status(StatusCodes.OK).json(result);
+    },
+  );
+
+  static reconcileAccountLines: RequestHandler = asyncHandler(
+    async (req: Request, res: Response) => {
+      const accountId = getAccountId(req);
+      const lineId = req.params.lineId;
+      const { candidateId } = req.body;
+
+      if (!lineId || Array.isArray(lineId)) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          message: 'Line ID is required.',
+        });
+      }
+
+      if (!candidateId || typeof candidateId !== 'string') {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          message: 'Candidate ID is required.',
+        });
+      }
+
+      await AccountService.getAccountInfo(accountId, req.session.userId!);
+
+      const result = await MatchingService.reconcileLines(
+        accountId,
+        lineId,
+        candidateId,
+      );
+
+      if (!result) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          message: 'The selected transaction cannot be reconciled.',
         });
       }
 

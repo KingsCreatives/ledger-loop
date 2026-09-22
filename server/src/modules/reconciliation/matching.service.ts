@@ -1,6 +1,7 @@
 import { LineType } from '../../../generated/prisma/enums.js';
 import { ValidatedImportRow } from '../import/import.types.js';
 import { prisma } from '../../shared/utils/prisma.js';
+import { Prisma } from '../../../generated/prisma/client.js';
 import { ImportRowClassification, MatchingType } from './matching.types.js';
 
 export class MatchingService {
@@ -74,7 +75,9 @@ export class MatchingService {
 
     return {
       line,
-      candidates: candidates.filter((candidate: { id: string; }) => candidate.id !== line.id),
+      candidates: candidates.filter(
+        (candidate: { id: string }) => candidate.id !== line.id,
+      ),
     };
   }
 
@@ -120,6 +123,73 @@ export class MatchingService {
           date: 'asc',
         },
       },
+    });
+  }
+
+  static async reconcileLines(
+    accountId: string,
+    lineId: string,
+    candidateId: string,
+  ) {
+    return prisma.$transaction(async (tx:Prisma.TransactionClient) => {
+      const lines = await tx.transactionLine.findMany({
+        where: {
+          id: {
+            in: [lineId, candidateId],
+          },
+          accountId,
+          isReconciled: false,
+        },
+        include: {
+          journalEntryLine: true,
+        },
+      });
+
+      if (lines.length !== 2) {
+        return null;
+      }
+
+      const line = lines.find((item: {id: string}) => item.id === lineId);
+      const candidate = lines.find((item: {id: string}) => item.id === candidateId);
+
+      if (!line || !candidate) {
+        return null;
+      }
+
+      const dateDifference = Math.abs(
+        line.journalEntryLine.date.getTime() -
+          candidate.journalEntryLine.date.getTime(),
+      );
+
+      const daysDifference = dateDifference / (1000 * 60 * 60 * 24);
+
+      if (
+        line.amount !== candidate.amount ||
+        line.type !== candidate.type ||
+        daysDifference > this.DATE_TOLERANCE_DAYS
+      ) {
+        return null;
+      }
+
+      const reconciledAt = new Date();
+
+      await tx.transactionLine.updateMany({
+        where: {
+          id: {
+            in: [lineId, candidateId],
+          },
+        },
+        data: {
+          isReconciled: true,
+          reconciledAt,
+        },
+      });
+
+      return {
+        lineId,
+        candidateId,
+        reconciledAt,
+      };
     });
   }
 }

@@ -3,6 +3,7 @@ import { prisma } from '../../../shared/utils/prisma.js';
 import { MatchingService } from '../matching.service.js';
 import { LineType } from '../../../../generated/prisma/enums.js';
 
+
 describe('MatchingService.getOutstandingItems', () => {
   let userId: string;
   let accountId: string;
@@ -221,5 +222,138 @@ describe('MatchingService.getOutstandingItems', () => {
         (candidate: { id: string; }) => candidate.id === targetEntry.lines[0].id,
       ),
     ).toBe(false);
+  });
+
+  it('should reconcile two matching transaction lines', async () => {
+    const targetEntry = await prisma.journalEntry.create({
+      data: {
+        date: new Date('2026-09-01'),
+        description: 'Bank transaction',
+        lines: {
+          create: [
+            {
+              accountId,
+              amount: 50000,
+              type: LineType.DEBIT,
+              isReconciled: false,
+            },
+          ],
+        },
+      },
+      include: {
+        lines: true,
+      },
+    });
+
+    const candidateEntry = await prisma.journalEntry.create({
+      data: {
+        date: new Date('2026-09-03'),
+        description: 'Matching ledger transaction',
+        lines: {
+          create: [
+            {
+              accountId,
+              amount: 50000,
+              type: LineType.DEBIT,
+              isReconciled: false,
+            },
+          ],
+        },
+      },
+      include: {
+        lines: true,
+      },
+    });
+
+    const result = await MatchingService.reconcileLines(
+      accountId,
+      targetEntry.lines[0].id,
+      candidateEntry.lines[0].id,
+    );
+
+    expect(result).not.toBeNull();
+    expect(result?.lineId).toBe(targetEntry.lines[0].id);
+    expect(result?.candidateId).toBe(candidateEntry.lines[0].id);
+    expect(result?.reconciledAt).toBeInstanceOf(Date);
+
+    const reconciledLines = await prisma.transactionLine.findMany({
+      where: {
+        id: {
+          in: [targetEntry.lines[0].id, candidateEntry.lines[0].id],
+        },
+      },
+    });
+
+    expect(reconciledLines).toHaveLength(2);
+
+    for (const line of reconciledLines) {
+      expect(line.isReconciled).toBe(true);
+      expect(line.reconciledAt).not.toBeNull();
+    }
+  });
+
+  it('should not reconcile lines that do not match', async () => {
+    const targetEntry = await prisma.journalEntry.create({
+      data: {
+        date: new Date('2026-09-01'),
+        description: 'Bank transaction',
+        lines: {
+          create: [
+            {
+              accountId,
+              amount: 50000,
+              type: LineType.DEBIT,
+              isReconciled: false,
+            },
+          ],
+        },
+      },
+      include: {
+        lines: true,
+      },
+    });
+
+    const candidateEntry = await prisma.journalEntry.create({
+      data: {
+        date: new Date('2026-09-03'),
+        description: 'Wrong amount transaction',
+        lines: {
+          create: [
+            {
+              accountId,
+              amount: 75000,
+              type: LineType.DEBIT,
+              isReconciled: false,
+            },
+          ],
+        },
+      },
+      include: {
+        lines: true,
+      },
+    });
+
+    const result = await MatchingService.reconcileLines(
+      accountId,
+      targetEntry.lines[0].id,
+      candidateEntry.lines[0].id,
+    );
+
+    expect(result).toBeNull();
+
+    const lines = await prisma.transactionLine.findMany({
+      where: {
+        id: {
+          in: [targetEntry.lines[0].id, candidateEntry.lines[0].id],
+        },
+      },
+    });
+
+    expect(lines).toHaveLength(2);
+
+    for (const line of lines) {
+      expect(line.isReconciled).toBe(false);
+      expect(line.reconciledAt).toBeNull();
+    }
   });
 });
