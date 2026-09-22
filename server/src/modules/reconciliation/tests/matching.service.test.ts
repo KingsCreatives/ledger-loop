@@ -157,4 +157,69 @@ describe('MatchingService.getOutstandingItems', () => {
     expect(results[0].id).toBe(entry.lines[0].id);
     expect(results[0].journalEntryLine.description).toBe('Matching candidate');
   });
+
+  it('should find matching candidates for an outstanding transaction line', async () => {
+    const targetEntry = await prisma.journalEntry.create({
+      data: {
+        date: new Date('2026-09-01'),
+        description: 'Bank transaction',
+        lines: {
+          create: [
+            {
+              accountId,
+              amount: 50000,
+              type: LineType.DEBIT,
+              isReconciled: false,
+            },
+          ],
+        },
+      },
+      include: {
+        lines: true,
+      },
+    });
+
+    const candidateEntry = await prisma.journalEntry.create({
+      data: {
+        date: new Date('2026-09-03'),
+        description: 'Matching ledger transaction',
+        lines: {
+          create: [
+            {
+              accountId,
+              amount: 50000,
+              type: LineType.DEBIT,
+              isReconciled: false,
+            },
+          ],
+        },
+      },
+      include: {
+        lines: true,
+      },
+    });
+
+    const result = await MatchingService.findMatchesForLine(
+      targetEntry.lines[0].id,
+      accountId,
+    );
+
+    expect(result).not.toBeNull();
+
+    expect(result?.line.id).toBe(targetEntry.lines[0].id);
+
+    expect(result?.candidates).toHaveLength(1);
+
+    expect(result?.candidates[0].id).toBe(candidateEntry.lines[0].id);
+
+    expect(result?.candidates[0].journalEntryLine.description).toBe(
+      'Matching ledger transaction',
+    );
+
+    expect(
+      result?.candidates.some(
+        (candidate: { id: string; }) => candidate.id === targetEntry.lines[0].id,
+      ),
+    ).toBe(false);
+  });
 });

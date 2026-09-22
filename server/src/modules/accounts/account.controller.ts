@@ -82,4 +82,36 @@ export class AccountController {
       return res.status(StatusCodes.OK).json(outstandingItems);
     },
   );
+
+  static getAccountReconciliationMatches: RequestHandler = asyncHandler(
+    async (req: Request, res: Response) => {
+      const accountId = getAccountId(req);
+
+      const lineId = req.params.lineId;
+
+      if (!lineId || Array.isArray(lineId)) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          message: 'Line ID is required',
+        });
+      }
+
+      await AccountService.getAccountInfo(
+        accountId, 
+        req.session.userId!
+      );
+
+      const result = await MatchingService.findMatchesForLine(
+        lineId,
+        accountId,
+      );
+
+      if (!result) {
+        return res.status(StatusCodes.NOT_FOUND).json({
+          message: 'Reconciliation item not found.',
+        });
+      }
+
+      return res.status(StatusCodes.OK).json(result);
+    },
+  );
 }

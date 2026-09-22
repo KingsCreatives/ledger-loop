@@ -14,6 +14,13 @@ accountRouter.get(
   '/:accountId/transactions',
   AccountController.getAccountTransactions,
 );
-accountRouter.get('/:accountId/reconciliation', AccountController.getAccountReconciliation)
+accountRouter.get(
+  '/:accountId/reconciliation',
+  AccountController.getAccountReconciliation,
+);
+accountRouter.get(
+  '/:accountId/reconciliation/:lineId/matches',
+  AccountController.getAccountReconciliationMatches,
+);
 
 export default accountRouter;

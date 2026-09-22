@@ -4,7 +4,6 @@ import { prisma } from '../../shared/utils/prisma.js';
 import { ImportRowClassification, MatchingType } from './matching.types.js';
 
 export class MatchingService {
-  
   static readonly DATE_TOLERANCE_DAYS = 5;
 
   static async findCandidatesByCriteria(
@@ -49,6 +48,36 @@ export class MatchingService {
       row.date,
     );
   }
+
+  static async findMatchesForLine(lineId: string, accountId: string) {
+    const line = await prisma.transactionLine.findFirst({
+      where: {
+        id: lineId,
+        accountId,
+        isReconciled: false,
+      },
+      include: {
+        journalEntryLine: true,
+      },
+    });
+
+    if (!line) {
+      return null;
+    }
+
+    const candidates = await this.findCandidatesByCriteria(
+      accountId,
+      line.amount,
+      line.type,
+      line.journalEntryLine.date,
+    );
+
+    return {
+      line,
+      candidates: candidates.filter((candidate: { id: string; }) => candidate.id !== line.id),
+    };
+  }
+
   static async classifyImportRows(
     rows: ValidatedImportRow[],
     accountId: string,
