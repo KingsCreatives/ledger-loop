@@ -1,5 +1,5 @@
 import { Request } from "express";
-import { ValidationError } from "./errors";
+import { ValidationError } from "./errors.js";
 
 export function getAccountId(req: Request): string {
   const { accountId } = req.params;

@@ -1,10 +1,11 @@
 import { Request, Response, RequestHandler } from 'express';
-import { AccountService } from './account.service';
-import { createAccountSchema } from './account.schema';
-import { AccountType } from '../../../generated/prisma/enums';
+import { AccountService } from './account.service.js';
+import { createAccountSchema } from './account.schema.js';
+import { AccountType } from '../../../generated/prisma/enums.js';
 import { StatusCodes } from 'http-status-codes';
-import { asyncHandler } from '../../shared/utils/asyncHandler';
-import { getAccountId } from '../../shared/utils/getAccountId';
+import { asyncHandler } from '../../shared/utils/asyncHandler.js';
+import { getAccountId } from '../../shared/utils/getAccountId.js';
+import { MatchingService } from '../reconciliation/matching.service.js';
 
 export class AccountController {
   static createAccount: RequestHandler = asyncHandler(
@@ -66,6 +67,84 @@ export class AccountController {
         req.session.userId!,
       );
       return res.status(StatusCodes.OK).json(transactions);
+    },
+  );
+
+  static getAccountReconciliation: RequestHandler = asyncHandler(
+    async (req: Request, res: Response) => {
+      const accountId = getAccountId(req);
+
+      await AccountService.getAccountInfo(accountId, req.session.userId!);
+
+      const outstandingItems =
+        await MatchingService.getOutstandingItems(accountId);
+
+      return res.status(StatusCodes.OK).json(outstandingItems);
+    },
+  );
+
+  static getAccountReconciliationMatches: RequestHandler = asyncHandler(
+    async (req: Request, res: Response) => {
+      const accountId = getAccountId(req);
+
+      const lineId = req.params.lineId;
+
+      if (!lineId || Array.isArray(lineId)) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          message: 'Line ID is required',
+        });
+      }
+
+      await AccountService.getAccountInfo(accountId, req.session.userId!);
+
+      const result = await MatchingService.findMatchesForLine(
+        lineId,
+        accountId,
+      );
+
+      if (!result) {
+        return res.status(StatusCodes.NOT_FOUND).json({
+          message: 'Reconciliation item not found.',
+        });
+      }
+
+      return res.status(StatusCodes.OK).json(result);
+    },
+  );
+
+  static reconcileAccountLines: RequestHandler = asyncHandler(
+    async (req: Request, res: Response) => {
+      const accountId = getAccountId(req);
+      const lineId = req.params.lineId;
+      const { candidateId } = req.body;
+
+      if (!lineId || Array.isArray(lineId)) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          message: 'Line ID is required.',
+        });
+      }
+
+      if (!candidateId || typeof candidateId !== 'string') {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          message: 'Candidate ID is required.',
+        });
+      }
+
+      await AccountService.getAccountInfo(accountId, req.session.userId!);
+
+      const result = await MatchingService.reconcileLines(
+        accountId,
+        lineId,
+        candidateId,
+      );
+
+      if (!result) {
+        return res.status(StatusCodes.BAD_REQUEST).json({
+          message: 'The selected transaction cannot be reconciled.',
+        });
+      }
+
+      return res.status(StatusCodes.OK).json(result);
     },
   );
 }

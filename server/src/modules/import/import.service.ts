@@ -1,19 +1,22 @@
 import csvParser from 'csv-parser';
 import { Readable } from 'node:stream';
-import { ParsedCsvRow, ValidatedImportRow } from './import.types';
-import { validateRowSchema } from './import.schema';
-import { prisma } from '../../shared/utils/prisma';
-import { ImportStatus } from '../../../generated/prisma/enums';
+import { ParsedCsvRow, ValidatedImportRow } from './import.types.js';
+import { validateRowSchema } from './import.schema.js';
+import { prisma } from '../../shared/utils/prisma.js';
+import { EntrySource, ImportStatus } from '../../../generated/prisma/enums.js';
 import {
   ConflictError,
   NotFoundError,
   ValidationError,
-} from '../../shared/utils/errors';
-import { LineType } from '../../../generated/prisma/enums';
-import { CreateJournalEntryDTO } from '../../modules/ledger/ledger.types';
-import { LedgerService } from '../ledger/ledger.service';
-import { ImportRow } from '../../../generated/prisma/client';
+} from '../../shared/utils/errors.js';
+import { LineType } from '../../../generated/prisma/enums.js';
+import { CreateJournalEntryDTO } from '../../modules/ledger/ledger.types.js';
+import { LedgerService } from '../ledger/ledger.service.js';
+import { ImportRow } from '../../../generated/prisma/client.js';
 import crypto from 'node:crypto';
+import { ImportRowDecision } from './import.types.js';
+import { MatchingService } from '../reconciliation/matching.service.js';
+import { Prisma } from '../../../generated/prisma/browser.js';
 
 export class ImportService {
   static computeContentHash(buffer: Buffer): string {
@@ -127,15 +130,6 @@ export class ImportService {
       );
     }
 
-    // const existingBatch = await prisma.importBatch.findFirst({
-    //   where: { accountId, contentHash },
-    // });
-
-    // if (existingBatch) {
-    //   throw new ConflictError(
-    //     'This statement has already been imported for this account.',
-    //   );
-    // }
     const existingBatch = await prisma.importBatch.findFirst({
       where: { accountId, contentHash },
     });
@@ -289,48 +283,151 @@ export class ImportService {
     };
   }
 
-  static async commitImport(
-    batchId: string,
-    offsetAccountId: string,
-    userId: string,
-  ) {
-    const batch = await this.loadImportBatch(batchId, userId);
+ static async commitImport(
+  batchId: string,
+  offsetAccountId: string,
+  userId: string,
+  decisions: ImportRowDecision[],
+) {
+  const batch = await this.loadImportBatch(batchId, userId);
 
-    if (batch.importRows.length === 0) {
-      throw new ValidationError('Import contains no valid rows');
-    }
+  if (batch.importRows.length === 0) {
+    throw new ValidationError('Import contains no valid rows');
+  }
 
-    return prisma.$transaction(
-      async (tx: {
-        importBatch: {
-          update: (arg0: { where: { id: any }; data: { status: any } }) => any;
-        };
-      }) => {
-        for (const row of batch.importRows) {
-          const dto = this.buildJournalEntryDTO(
-            row,
-            batch.accountId,
-            offsetAccountId,
-          );
+  // Prevent two import rows from matching the same transaction line
+  const linkedCandidateIds = decisions
+    .filter((decision) => decision.status === 'LINKED')
+    .map((decision) => decision.candidateId);
 
-          await LedgerService.createEntry(dto, userId);
-        }
+  if (new Set(linkedCandidateIds).size !== linkedCandidateIds.length) {
+    throw new ValidationError(
+      'Two rows cannot be matched to the same existing transaction.',
+    );
+  }
 
-        await tx.importBatch.update({
+  return prisma.$transaction(async (tx : Prisma.TransactionClient) => {
+    let created = 0;
+    let reconciled = 0;
+
+    for (const row of batch.importRows) {
+
+      if (!row.date || !row.description || row.amount === null) {
+        throw new ValidationError('Invalid import row');
+      }
+      
+      const decision = decisions.find(
+        (item) => item.rowNumber === row.rowNumber,
+      );
+
+      if (decision?.status === 'LINKED') {
+
+        const candidate = await tx.transactionLine.findFirst({
           where: {
-            id: batch.id,
-          },
-          data: {
-            status: ImportStatus.COMMITTED,
+            id: decision.candidateId,
+            accountId: batch.accountId,
+            isReconciled: false,
+            amount: Math.abs(row.amount),
+            type: row.amount > 0 ? LineType.DEBIT : LineType.CREDIT,
+            journalEntryLine: {
+              date: {
+                gte: new Date(
+                  row.date.getTime() -
+                    MatchingService.DATE_TOLERANCE_DAYS * 24 * 60 * 60 * 1000,
+                ),
+                lte: new Date(
+                  row.date.getTime() +
+                    MatchingService.DATE_TOLERANCE_DAYS * 24 * 60 * 60 * 1000,
+                ),
+              },
+            },
           },
         });
 
-        return {
-          batchId: batch.id,
-          imported: batch.importRows.length,
-          status: ImportStatus.COMMITTED,
-        };
+        if (!candidate) {
+          throw new ValidationError(
+            'Selected transaction is invalid, already reconciled, or does not belong to this account.',
+          );
+        }
+
+        await tx.transactionLine.update({
+          where: {
+            id: candidate.id,
+          },
+          data: {
+            isReconciled: true,
+            reconciledAt: new Date(),
+          },
+        });
+
+        await tx.importRow.update({
+          where: {
+            id: row.id,
+          },
+          data: {
+            matchLineId: candidate.id,
+          },
+        });
+
+        reconciled++;
+        continue;
+      }
+
+      const dto = this.buildJournalEntryDTO(
+        row,
+        batch.accountId,
+        offsetAccountId,
+      );
+
+      dto.source = EntrySource.IMPORT;
+
+      const newEntry = await LedgerService.createEntry(
+        dto,
+        userId,
+        tx,
+      );
+
+      const bankLine = await tx.transactionLine.findFirst({
+        where: {
+          journalEntryId: newEntry.id,
+          accountId: batch.accountId,
+        },
+      });
+
+      if (!bankLine) {
+        throw new ValidationError(
+          'Failed to identify the bank transaction line.',
+        );
+      }
+
+      await tx.transactionLine.update({
+        where: {
+          id: bankLine.id,
+        },
+        data: {
+          isReconciled: true,
+          reconciledAt: new Date(),
+        },
+      });
+
+      created++;
+    }
+
+    await tx.importBatch.update({
+      where: {
+        id: batch.id,
       },
-    );
-  }
+      data: {
+        status: ImportStatus.COMMITTED,
+      },
+    });
+
+    return {
+      batchId: batch.id,
+      created,
+      reconciled,
+      status: ImportStatus.COMMITTED,
+    };
+  });
+}
 }

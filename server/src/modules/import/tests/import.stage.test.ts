@@ -36,6 +36,7 @@ describe('ImportService.stageImport', () => {
       userId,
       accountId,
       filename: 'statement.csv',
+      contentHash: 'test-hash-1',
 
       validRows: [
         {
@@ -68,6 +69,7 @@ describe('ImportService.stageImport', () => {
       userId,
       accountId,
       filename: 'statement.csv',
+      contentHash: 'test-hash-1',
 
       validRows: [],
 
@@ -104,6 +106,7 @@ describe('ImportService.stageImport', () => {
         userId,
         accountId,
         filename,
+        contentHash: 'test-hash-3',
 
         validRows: [
           {
@@ -149,6 +152,7 @@ describe('ImportService.stageImport', () => {
         userId,
         accountId: otherAccount.id,
         filename: `unauthorized-account-${Date.now()}.csv`,
+        contentHash: 'test-hash-4',
 
         validRows: [
           {
@@ -172,258 +176,266 @@ describe('ImportService.stageImport', () => {
     expect(batch).toBeNull();
   });
 
- it('should create a validated batch when no rows are provided', async () => {
-   const filename = `empty-${Date.now()}.csv`;
+  it('should create a validated batch when no rows are provided', async () => {
+    const filename = `empty-${Date.now()}.csv`;
 
-   const batch = await ImportService.stageImport({
-     userId,
-     accountId,
-     filename,
-     validRows: [],
-     errors: [],
-   });
+    const batch = await ImportService.stageImport({
+      userId,
+      accountId,
+      filename,
+      contentHash: 'test-hash-5',
+      validRows: [],
+      errors: [],
+    });
 
-   expect(batch.status).toBe('VALIDATED');
+    expect(batch.status).toBe('VALIDATED');
 
-   const rows = await prisma.importRow.findMany({
-     where: {
-       batchId: batch.id,
-     },
-   });
+    const rows = await prisma.importRow.findMany({
+      where: {
+        batchId: batch.id,
+      },
+    });
 
-   expect(rows).toHaveLength(0);
- });
+    expect(rows).toHaveLength(0);
+  });
 
- it('should set the batch status to VALIDATED after staging', async () => {
-   const filename = `status-${Date.now()}.csv`;
+  it('should set the batch status to VALIDATED after staging', async () => {
+    const filename = `status-${Date.now()}.csv`;
 
-   const batch = await ImportService.stageImport({
-     userId,
-     accountId,
-     filename,
+    const batch = await ImportService.stageImport({
+      userId,
+      accountId,
+      filename,
+      contentHash: 'test-hash-6',
 
-     validRows: [
-       {
-         rowNumber: 1,
-         date: new Date('2026-08-01'),
-         description: 'Salary',
-         amount: 500000,
-       },
-     ],
+      validRows: [
+        {
+          rowNumber: 1,
+          date: new Date('2026-08-01'),
+          description: 'Salary',
+          amount: 500000,
+        },
+      ],
 
-     errors: [],
-   });
+      errors: [],
+    });
 
-   const storedBatch = await prisma.importBatch.findUnique({
-     where: {
-       id: batch.id,
-     },
-   });
+    const storedBatch = await prisma.importBatch.findUnique({
+      where: {
+        id: batch.id,
+      },
+    });
 
-   expect(storedBatch).not.toBeNull();
-   expect(storedBatch?.status).toBe('VALIDATED');
- });
+    expect(storedBatch).not.toBeNull();
+    expect(storedBatch?.status).toBe('VALIDATED');
+  });
 
- it('should persist row numbers correctly for staged rows', async () => {
-   const filename = `row-numbers-${Date.now()}.csv`;
+  it('should persist row numbers correctly for staged rows', async () => {
+    const filename = `row-numbers-${Date.now()}.csv`;
 
-   const batch = await ImportService.stageImport({
-     userId,
-     accountId,
-     filename,
+    const batch = await ImportService.stageImport({
+      userId,
+      accountId,
+      filename,
+      contentHash: 'test-hash-6',
 
-     validRows: [
-       {
-         rowNumber: 1,
-         date: new Date('2026-08-01'),
-         description: 'Salary',
-         amount: 500000,
-       },
-       {
-         rowNumber: 3,
-         date: new Date('2026-08-03'),
-         description: 'Rent',
-         amount: 200000,
-       },
-     ],
+      validRows: [
+        {
+          rowNumber: 1,
+          date: new Date('2026-08-01'),
+          description: 'Salary',
+          amount: 500000,
+        },
+        {
+          rowNumber: 3,
+          date: new Date('2026-08-03'),
+          description: 'Rent',
+          amount: 200000,
+        },
+      ],
 
-     errors: [
-       {
-         row: 2,
-         message: 'amount: Invalid amount',
-         raw: {
-           date: '2026-08-02',
-           description: 'Invalid transaction',
-           amount: 'abc',
-         },
-       },
-     ],
-   });
+      errors: [
+        {
+          row: 2,
+          message: 'amount: Invalid amount',
+          raw: {
+            date: '2026-08-02',
+            description: 'Invalid transaction',
+            amount: 'abc',
+          },
+        },
+      ],
+    });
 
-   const rows = await prisma.importRow.findMany({
-     where: {
-       batchId: batch.id,
-     },
-     orderBy: {
-       rowNumber: 'asc',
-     },
-   });
+    const rows = await prisma.importRow.findMany({
+      where: {
+        batchId: batch.id,
+      },
+      orderBy: {
+        rowNumber: 'asc',
+      },
+    });
 
-   expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(3);
 
-   expect(rows[0].rowNumber).toBe(1);
-   expect(rows[0].isValid).toBe(true);
+    expect(rows[0].rowNumber).toBe(1);
+    expect(rows[0].isValid).toBe(true);
 
-   expect(rows[1].rowNumber).toBe(2);
-   expect(rows[1].isValid).toBe(false);
-   expect(rows[1].errorMessage).toBe('amount: Invalid amount');
+    expect(rows[1].rowNumber).toBe(2);
+    expect(rows[1].isValid).toBe(false);
+    expect(rows[1].errorMessage).toBe('amount: Invalid amount');
 
-   expect(rows[2].rowNumber).toBe(3);
-   expect(rows[2].isValid).toBe(true);
- });
+    expect(rows[2].rowNumber).toBe(3);
+    expect(rows[2].isValid).toBe(true);
+  });
 
- it('should persist rows with the correct row numbers', async () => {
-   const result = await ImportService.stageImport({
-     userId,
-     accountId,
-     filename: 'row-numbering.csv',
+  it('should persist rows with the correct row numbers', async () => {
+    const result = await ImportService.stageImport({
+      userId,
+      accountId,
+      filename: 'row-numbering.csv',
+      contentHash: 'test-hash-7',
 
-     validRows: [
-       {
-         rowNumber: 1,
-         date: new Date('2026-08-01'),
-         description: 'Salary',
-         amount: 500000,
-       },
-       {
-         rowNumber: 2,
-         date: new Date('2026-08-02'),
-         description: 'Rent',
-         amount: -150000,
-       },
-       {
-         rowNumber: 3,
-         date: new Date('2026-08-03'),
-         description: 'Utilities',
-         amount: -30000,
-       },
-     ],
+      validRows: [
+        {
+          rowNumber: 1,
+          date: new Date('2026-08-01'),
+          description: 'Salary',
+          amount: 500000,
+        },
+        {
+          rowNumber: 2,
+          date: new Date('2026-08-02'),
+          description: 'Rent',
+          amount: -150000,
+        },
+        {
+          rowNumber: 3,
+          date: new Date('2026-08-03'),
+          description: 'Utilities',
+          amount: -30000,
+        },
+      ],
 
-     errors: [],
-   });
+      errors: [],
+    });
 
-   const rows = await prisma.importRow.findMany({
-     where: {
-       batchId: result.id,
-     },
-     orderBy: {
-       rowNumber: 'asc',
-     },
-   });
+    const rows = await prisma.importRow.findMany({
+      where: {
+        batchId: result.id,
+      },
+      orderBy: {
+        rowNumber: 'asc',
+      },
+    });
 
-   expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(3);
 
-   expect(rows.map((row: { rowNumber: any; }) => row.rowNumber)).toEqual([1, 2, 3]);
+    expect(rows.map((row: { rowNumber: any }) => row.rowNumber)).toEqual([
+      1, 2, 3,
+    ]);
 
-   expect(rows.map((row: { description: any; }) => row.description)).toEqual([
-     'Salary',
-     'Rent',
-     'Utilities',
-   ]);
- });
+    expect(rows.map((row: { description: any }) => row.description)).toEqual([
+      'Salary',
+      'Rent',
+      'Utilities',
+    ]);
+  });
 
- it('should persist both valid and invalid rows in the same batch', async () => {
-   const filename = `mixed-${Date.now()}.csv`;
+  it('should persist both valid and invalid rows in the same batch', async () => {
+    const filename = `mixed-${Date.now()}.csv`;
 
-   const batch = await ImportService.stageImport({
-     userId,
-     accountId,
-     filename,
+    const batch = await ImportService.stageImport({
+      userId,
+      accountId,
+      filename,
+      contentHash: 'test-hash-6',
 
-     validRows: [
-       {
-         rowNumber: 1,
-         date: new Date('2026-08-01'),
-         description: 'Salary',
-         amount: 500000,
-       },
-       {
-         rowNumber: 3,
-         date: new Date('2026-08-03'),
-         description: 'Rent',
-         amount: -150000,
-       },
-     ],
+      validRows: [
+        {
+          rowNumber: 1,
+          date: new Date('2026-08-01'),
+          description: 'Salary',
+          amount: 500000,
+        },
+        {
+          rowNumber: 3,
+          date: new Date('2026-08-03'),
+          description: 'Rent',
+          amount: -150000,
+        },
+      ],
 
-     errors: [
-       {
-         row: 2,
-         message: 'amount: Invalid amount',
-         raw: {
-           date: '2026-08-02',
-           description: 'Invalid transaction',
-           amount: 'abc',
-         },
-       },
-     ],
-   });
+      errors: [
+        {
+          row: 2,
+          message: 'amount: Invalid amount',
+          raw: {
+            date: '2026-08-02',
+            description: 'Invalid transaction',
+            amount: 'abc',
+          },
+        },
+      ],
+    });
 
-   const rows = await prisma.importRow.findMany({
-     where: {
-       batchId: batch.id,
-     },
-     orderBy: {
-       rowNumber: 'asc',
-     },
-   });
+    const rows = await prisma.importRow.findMany({
+      where: {
+        batchId: batch.id,
+      },
+      orderBy: {
+        rowNumber: 'asc',
+      },
+    });
 
-   expect(rows).toHaveLength(3);
+    expect(rows).toHaveLength(3);
 
-   expect(rows[0]).toMatchObject({
-     rowNumber: 1,
-     description: 'Salary',
-     amount: 500000,
-     isValid: true,
-   });
+    expect(rows[0]).toMatchObject({
+      rowNumber: 1,
+      description: 'Salary',
+      amount: 500000,
+      isValid: true,
+    });
 
-   expect(rows[1]).toMatchObject({
-     rowNumber: 2,
-     description: 'Invalid transaction',
-     isValid: false,
-     errorMessage: 'amount: Invalid amount',
-   });
+    expect(rows[1]).toMatchObject({
+      rowNumber: 2,
+      description: 'Invalid transaction',
+      isValid: false,
+      errorMessage: 'amount: Invalid amount',
+    });
 
-   expect(rows[2]).toMatchObject({
-     rowNumber: 3,
-     description: 'Rent',
-     amount: -150000,
-     isValid: true,
-   });
- });
+    expect(rows[2]).toMatchObject({
+      rowNumber: 3,
+      description: 'Rent',
+      amount: -150000,
+      isValid: true,
+    });
+  });
 
- it('should persist the batch with the correct filename and user ownership', async () => {
-   const filename = `ownership-${Date.now()}.csv`;
+  it('should persist the batch with the correct filename and user ownership', async () => {
+    const filename = `ownership-${Date.now()}.csv`;
 
-   const batch = await ImportService.stageImport({
-     userId,
-     accountId,
-     filename,
+    const batch = await ImportService.stageImport({
+      userId,
+      accountId,
+      filename,
+      contentHash: 'test-hash-6',
 
-     validRows: [
-       {
-         rowNumber: 1,
-         date: new Date('2026-08-01'),
-         description: 'Salary',
-         amount: 500000,
-       },
-     ],
+      validRows: [
+        {
+          rowNumber: 1,
+          date: new Date('2026-08-01'),
+          description: 'Salary',
+          amount: 500000,
+        },
+      ],
 
-     errors: [],
-   });
+      errors: [],
+    });
 
-   expect(batch.filename).toBe(filename);
-   expect(batch.userId).toBe(userId);
-   expect(batch.accountId).toBe(accountId);
-   expect(batch.status).toBe('VALIDATED');
- });
+    expect(batch.filename).toBe(filename);
+    expect(batch.userId).toBe(userId);
+    expect(batch.accountId).toBe(accountId);
+    expect(batch.status).toBe('VALIDATED');
+  });
 });

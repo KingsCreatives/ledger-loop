@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { AccountController } from './account.controller';
-import { requireAuth } from '../../shared/middleware/auth.middleware';
+import { AccountController } from './account.controller.js';
+import { requireAuth } from '../../shared/middleware/auth.middleware.js';
 
 const accountRouter: Router = Router();
 
@@ -13,6 +13,18 @@ accountRouter.get('/:accountId/balance', AccountController.getAccountBalance);
 accountRouter.get(
   '/:accountId/transactions',
   AccountController.getAccountTransactions,
+);
+accountRouter.get(
+  '/:accountId/reconciliation',
+  AccountController.getAccountReconciliation,
+);
+accountRouter.get(
+  '/:accountId/reconciliation/:lineId/matches',
+  AccountController.getAccountReconciliationMatches,
+);
+accountRouter.post(
+  '/:accountId/reconciliation/:lineId/match',
+  AccountController.reconcileAccountLines,
 );
 
 export default accountRouter;

@@ -27,6 +27,11 @@ enum ImportStatus {
   FAILED
 }
 
+enum EntrySource {
+  MANUAL
+  IMPORT
+}
+
 model User {
   id            String        @id @default(uuid())
   email         String        @unique
@@ -56,6 +61,8 @@ model JournalEntry {
   date        DateTime
   description String
 
+  source EntrySource @default(MANUAL)
+
   lines TransactionLine[]
 
   createdAt DateTime @default(now())
@@ -67,6 +74,9 @@ model TransactionLine {
   amount Int
   type   LineType
 
+  isReconciled Boolean @default(false)
+  reconciledAt DateTime?
+
   journalEntryLine JournalEntry @relation(fields: [journalEntryId], references: [id])
   journalEntryId   String
 
@@ -75,6 +85,8 @@ model TransactionLine {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  importRows ImportRow[]
 }
 
 model ImportBatch {
@@ -110,6 +122,9 @@ model ImportRow {
 
   isValid      Boolean @default(false)
   errorMessage String?
+
+  matchLineId String?
+  matchedLine TransactionLine? @relation(fields: [matchLineId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

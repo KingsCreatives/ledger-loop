@@ -1,8 +1,8 @@
-import { LineType } from '../../../generated/prisma/client';
-import { CreateJournalEntryDTO } from './ledger.types';
-import { prisma } from '../../shared/utils/prisma';
-import { ValidationError } from '../../shared/utils/errors';
-import { Prisma } from '../../../generated/prisma/browser';
+import { LineType } from '../../../generated/prisma/client.js';
+import { CreateJournalEntryDTO } from './ledger.types.js';
+import { prisma } from '../../shared/utils/prisma.js';
+import { ValidationError } from '../../shared/utils/errors.js';
+import { Prisma } from '../../../generated/prisma/browser.js';
 
 export class LedgerService {
   static async createEntry(
@@ -51,6 +51,7 @@ export class LedgerService {
       data: {
         date: data.date,
         description: data.description,
+        source: data.source,
         lines: { create: data.lines },
       },
     });
