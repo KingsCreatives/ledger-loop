@@ -1,7 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterAll, describe, expect, it } from 'vitest';
 import { AccountService } from '../account.service.js';
 import { AccountType, LineType } from '../../../../generated/prisma/client.js';
 import { prisma } from '../../../shared/utils/prisma.js';
+
+afterAll(async () => {
+  await prisma.$disconnect();
+});
 
 describe('AccountService.createAccount', () => {
   it('should create a new account with valid data', async () => {
@@ -21,7 +25,9 @@ describe('AccountService.createAccount', () => {
     expect(account.type).toBe(type);
     expect(account.userId).toBe(user.id);
   });
+});
 
+describe('AccountService.listAccounts', () => {
   it('should list only accounts belonging to the user', async () => {
     const user = await prisma.user.create({
       data: {
@@ -105,7 +111,9 @@ describe('AccountService.createAccount', () => {
     expect(accounts[0].name).toBe('Owner Account');
     expect(accounts[0].userId).toBe(user.id);
   });
+});
 
+describe('AccountService.getAccountBalance', () => {
   it('should calculate an asset account balance as debit minus credit', async () => {
     const user = await prisma.user.create({
       data: {
@@ -192,6 +200,117 @@ describe('AccountService.createAccount', () => {
     expect(balance).toBe(1500);
   });
 
+  it('should calculate an expense account balance as debit minus credit', async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: `expense-${crypto.randomUUID()}@example.com`,
+        password: 'password123',
+      },
+    });
+
+    const account = await AccountService.createAccount(
+      'Office Expense',
+      AccountType.EXPENSE,
+      user.id,
+    );
+
+    const journalEntry = await prisma.journalEntry.create({
+      data: {
+        date: new Date(),
+        description: 'Test expense movement',
+      },
+    });
+
+    await prisma.transactionLine.createMany({
+      data: [
+        {
+          amount: 1200,
+          type: LineType.DEBIT,
+          accountId: account.id,
+          journalEntryId: journalEntry.id,
+        },
+        {
+          amount: 200,
+          type: LineType.CREDIT,
+          accountId: account.id,
+          journalEntryId: journalEntry.id,
+        },
+      ],
+    });
+
+    const balance = await AccountService.getAccountBalance(account.id, user.id);
+
+    expect(balance).toBe(1000);
+  });
+
+  it.each([AccountType.EQUITY, AccountType.REVENUE])(
+    'should calculate %s account balance as credit minus debit',
+    async (accountType) => {
+      const user = await prisma.user.create({
+        data: {
+          email: `${accountType.toLowerCase()}-${crypto.randomUUID()}@example.com`,
+          password: 'password123',
+        },
+      });
+
+      const account = await AccountService.createAccount(
+        `${accountType} Account`,
+        accountType,
+        user.id,
+      );
+
+      const journalEntry = await prisma.journalEntry.create({
+        data: {
+          date: new Date(),
+          description: `Test ${accountType} movement`,
+        },
+      });
+
+      await prisma.transactionLine.createMany({
+        data: [
+          {
+            amount: 2500,
+            type: LineType.CREDIT,
+            accountId: account.id,
+            journalEntryId: journalEntry.id,
+          },
+          {
+            amount: 500,
+            type: LineType.DEBIT,
+            accountId: account.id,
+            journalEntryId: journalEntry.id,
+          },
+        ],
+      });
+
+      const balance = await AccountService.getAccountBalance(
+        account.id,
+        user.id,
+      );
+
+      expect(balance).toBe(2000);
+    },
+  );
+
+  it('should return a balance of 0 for an account with no transactions', async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: `no-transactions-${crypto.randomUUID()}@example.com`,
+        password: 'password123',
+      },
+    });
+
+    const account = await AccountService.createAccount(
+      'Brand New Account',
+      AccountType.ASSETS,
+      user.id,
+    );
+
+    const balance = await AccountService.getAccountBalance(account.id, user.id);
+
+    expect(balance).toBe(0);
+  });
+
   it('should reject balance lookup when the account belongs to another user', async () => {
     const owner = await prisma.user.create({
       data: {
@@ -245,7 +364,9 @@ describe('AccountService.createAccount', () => {
       'Account ID is required.',
     );
   });
+});
 
+describe('AccountService.getAccountInfo', () => {
   it('should return account information with the calculated balance', async () => {
     const user = await prisma.user.create({
       data: {
@@ -347,7 +468,9 @@ describe('AccountService.createAccount', () => {
       'No account Id provided',
     );
   });
+});
 
+describe('AccountService.getAccountTransactions', () => {
   it('should return transactions for an account', async () => {
     const user = await prisma.user.create({
       data: {
