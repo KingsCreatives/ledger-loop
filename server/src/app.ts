@@ -8,7 +8,10 @@ import v1Router from '../src/api/v1';
 import { errorHandler } from '../src/shared/utils/errorHandler';
 
 const redisClient = createClient({
-  socket: { host: 'localhost', port: 6379 },
+  socket: {
+    host: process.env.REDIS_HOST || 'localhost',
+    port: Number(process.env.REDIS_PORT) || 6379,
+  },
 });
 
 redisClient.connect().catch(console.error);
@@ -19,7 +22,7 @@ const app: Application = express();
 
 app.use(
   cors({
-    origin: 'http://localhost:3000',
+    origin: process.env.CLIENT_URL || 'http://localhost:3000',
     credentials: true,
   }),
 );
@@ -32,7 +35,7 @@ app.use(
     resave: false,
     saveUninitialized: false,
     cookie: {
-      secure: false,
+      secure: process.env.NODE_ENV === 'production',
       httpOnly: true,
       maxAge: 1000 * 60 * 60 * 24,
     },
