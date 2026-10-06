@@ -1,10 +1,6 @@
 allowBuilds:
-  '@prisma/engines': false
-  bcrypt: false
-  esbuild: false
-  gitflow: false
-  prisma: false
-  unrs-resolver: false
-ignoredBuiltDependencies:
-  - '@prisma/engines'
-  - prisma
+  '@prisma/engines': true
+  bcrypt: true
+  esbuild: true
+  prisma: true
+  unrs-resolver: true
